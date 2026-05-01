@@ -1,0 +1,43 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-py"
+  interface = "asyncio"
+}
+
+model User {
+  id            Int           @id @default(autoincrement())
+  fullname      String
+  email         String        @unique
+  password      String
+  isAgreed      Boolean       @default(false)
+  role          Role          @default(USER)
+  isVerified    Boolean       @default(false)
+  accountStatus AccountStatus @default(PENDING)
+  otp           String?
+  displayname   String?
+  bio           String?
+  longitude     Float?
+  latitude      Float?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("users")
+}
+
+enum Role {
+  USER
+  SELLER
+  SERVICE_PROVIDER
+}
+
+enum AccountStatus {
+  ACTIVE
+  PENDING
+  DEACTIVE
+  SUSPEND
+  DELETE
+}

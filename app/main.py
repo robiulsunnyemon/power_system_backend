@@ -1,0 +1,25 @@
+from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from app.core.db import connect_db, disconnect_db
+from app.modules.auth.router import router as auth_router
+from app.modules.users.router import router as users_router
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_db()
+    yield
+    await disconnect_db()
+
+app = FastAPI(
+    title="Jorden Backend API",
+    description="FastAPI, Prisma, PostgreSQL Backend",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+app.include_router(auth_router)
+app.include_router(users_router)
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Jorden API"}
