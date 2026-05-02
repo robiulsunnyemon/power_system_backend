@@ -30,6 +30,9 @@ model User {
   
   reviews_given    Review[] @relation("BuyerReviews")
   reviews_received Review[] @relation("SellerReviews")
+  
+  messages_sent     Message[] @relation("SentMessages")
+  messages_received Message[] @relation("ReceivedMessages")
 
   @@map("users")
 }
@@ -145,6 +148,32 @@ model Review {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("reviews")
+}
+
+model Message {
+  id          Int         @id @default(autoincrement())
+  content     String
+  type        MessageType @default(TEXT)
+  fileUrl     String?
+  isRead      Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+
+  senderId    Int
+  sender      User        @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  receiverId  Int
+  receiver    User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  replyToId   Int?
+  replyTo     Message?    @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies     Message[]   @relation("MessageReplies")
+
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  FILE
 }
 
 enum OrderStatus {
