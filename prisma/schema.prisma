@@ -26,6 +26,7 @@ model User {
   updatedAt     DateTime      @updatedAt
   profile       UserProfile?
   products      Product[]
+  orders        Order[]
 
   @@map("users")
 }
@@ -84,11 +85,45 @@ model Product {
 
   categoryId    Int
   category      Category         @relation(fields: [categoryId], references: [id])
+  orders        Order[]
 
   @@map("products")
 }
 
+model Order {
+  id        Int             @id @default(autoincrement())
+  status    OrderStatus     @default(PENDING)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
 
+  userId    Int
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId Int
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  tracking  OrderTracking[]
+
+  @@map("orders")
+}
+
+model OrderTracking {
+  id        Int      @id @default(autoincrement())
+  status    String
+  createdAt DateTime @default(now())
+  
+  orderId   Int
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_trackings")
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  DELIVERED
+}
 
 enum ProductCondition {
   NEW
