@@ -25,6 +25,7 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   profile       UserProfile?
+  products      Product[]
 
   @@map("users")
 }
@@ -52,3 +53,52 @@ enum AccountStatus {
   SUSPEND
   DELETE
 }
+
+
+model Category {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id            Int              @id @default(autoincrement())
+  title         String
+  description   String
+  images        String[]
+  price         Float
+  condition     ProductCondition
+  status        ProductStatus    @default(ACTIVE)
+  longitude     Float?
+  latitude      Float?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  sellerId      Int
+  seller        User             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  categoryId    Int
+  category      Category         @relation(fields: [categoryId], references: [id])
+
+  @@map("products")
+}
+
+
+
+enum ProductCondition {
+  NEW
+  USED_LIKE_NEW
+  USED_GOOD
+  FAIR
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  DELETED
+  INACTIVE
+  SOLDOUT
+}
+
