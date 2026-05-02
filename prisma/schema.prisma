@@ -24,8 +24,18 @@ model User {
   latitude      Float?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  profile       UserProfile?
 
   @@map("users")
+}
+
+model UserProfile {
+  id           Int     @id @default(autoincrement())
+  profile_image String?
+  userId       Int     @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
 }
 
 enum Role {

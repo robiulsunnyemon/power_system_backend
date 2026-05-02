@@ -13,6 +13,7 @@ class UserProfileResponse(BaseModel):
     bio: Optional[str] = None
     longitude: Optional[float] = None
     latitude: Optional[float] = None
+    profile_image: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
 

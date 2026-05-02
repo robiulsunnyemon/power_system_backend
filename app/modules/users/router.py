@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.modules.users import service
 from app.modules.users.schemas import UserProfileResponse, UpdateProfileRequest
@@ -24,3 +24,11 @@ async def get_profile(user_id: int = Depends(get_current_user_id)):
 @router.put("/profile", response_model=UserProfileResponse)
 async def update_profile(data: UpdateProfileRequest, user_id: int = Depends(get_current_user_id)):
     return await service.update_user_profile(user_id, data)
+
+@router.post("/profile/image", response_model=UserProfileResponse)
+async def upload_profile_image(file: UploadFile = File(...), user_id: int = Depends(get_current_user_id)):
+    return await service.update_profile_image(user_id, file)
+
+@router.delete("/profile/image", response_model=UserProfileResponse)
+async def delete_profile_image(user_id: int = Depends(get_current_user_id)):
+    return await service.delete_profile_image(user_id)
