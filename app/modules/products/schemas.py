@@ -16,6 +16,13 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
 
+class SellerInfo(BaseModel):
+    id: int
+    fullname: str
+    email: str
+    displayname: Optional[str] = None
+    profile_image: Optional[str] = None
+
 class ProductCreate(BaseModel):
     title: str
     description: str
@@ -43,6 +50,7 @@ class ProductResponse(BaseModel):
     updatedAt: datetime
     sellerId: int
     category: CategoryResponse
+    seller: SellerInfo
 
     class Config:
         from_attributes = True

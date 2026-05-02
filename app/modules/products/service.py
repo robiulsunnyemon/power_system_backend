@@ -20,6 +20,21 @@ async def upload_product_images(files: List[UploadFile]):
             
     return {"urls": image_urls}
 
+def format_product_response(product):
+    """
+    Helper to format product data, flattening profile images.
+    """
+    p_dict = product.model_dump()
+    if product.seller:
+        p_dict["seller"] = {
+            "id": product.seller.id,
+            "fullname": product.seller.fullname,
+            "email": product.seller.email,
+            "displayname": product.seller.displayname,
+            "profile_image": product.seller.profile.profile_image if product.seller.profile else None
+        }
+    return p_dict
+
 async def create_product(seller_id: int, data: ProductCreate):
     """
     Creates a new product using pre-uploaded image URLs.
@@ -50,10 +65,10 @@ async def create_product(seller_id: int, data: ProductCreate):
             "categoryId": category.id,
             "status": ProductStatus.ACTIVE
         },
-        include={"category": True}
+        include={"category": True, "seller": {"include": {"profile": True}}}
     )
     
-    return product
+    return format_product_response(product)
 
 async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
     """
@@ -61,7 +76,7 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
     """
     all_products = await db.product.find_many(
         where={"sellerId": seller_id},
-        include={"category": True},
+        include={"category": True, "seller": {"include": {"profile": True}}},
         order={"createdAt": "desc"}
     )
     
@@ -85,7 +100,7 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
         "total_inactive": total_inactive,
         "total_deleted": total_deleted,
         "total_soldout": total_soldout,
-        "products": filtered_products
+        "products": [format_product_response(p) for p in filtered_products]
     }
 
 async def get_all_products(category_filter: str = "ALL"):
@@ -97,11 +112,13 @@ async def get_all_products(category_filter: str = "ALL"):
     if category_filter != "ALL":
         query["category"] = {"name": category_filter.upper().strip()}
         
-    return await db.product.find_many(
+    products = await db.product.find_many(
         where=query,
-        include={"category": True},
+        include={"category": True, "seller": {"include": {"profile": True}}},
         order={"createdAt": "desc"}
     )
+    
+    return [format_product_response(p) for p in products]
 
 async def get_all_categories():
     """
