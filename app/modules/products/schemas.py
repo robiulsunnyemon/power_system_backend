@@ -1,7 +1,16 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from enum import Enum
 from datetime import datetime
 from prisma.enums import ProductCondition, ProductStatus
+
+class ProductStatusFilter(str, Enum):
+    ALL = "ALL"
+    DRAFT = "DRAFT"
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"
+    INACTIVE = "INACTIVE"
+    SOLDOUT = "SOLDOUT"
 
 class CategoryResponse(BaseModel):
     id: int
@@ -37,3 +46,12 @@ class ProductResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class SellerProductsResponse(BaseModel):
+    total_products: int
+    total_active: int
+    total_draft: int
+    total_inactive: int
+    total_deleted: int
+    total_soldout: int
+    products: List[ProductResponse]

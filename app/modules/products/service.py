@@ -55,15 +55,38 @@ async def create_product(seller_id: int, data: ProductCreate):
     
     return product
 
-async def get_seller_products(seller_id: int):
+async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
     """
-    Returns all products belonging to a specific seller.
+    Returns all products belonging to a specific seller with status counts and optional filtering.
     """
-    return await db.product.find_many(
+    all_products = await db.product.find_many(
         where={"sellerId": seller_id},
         include={"category": True},
         order={"createdAt": "desc"}
     )
+    
+    # Calculate counts from all products
+    total_active = sum(1 for p in all_products if p.status == ProductStatus.ACTIVE)
+    total_draft = sum(1 for p in all_products if p.status == ProductStatus.DRAFT)
+    total_inactive = sum(1 for p in all_products if p.status == ProductStatus.INACTIVE)
+    total_deleted = sum(1 for p in all_products if p.status == ProductStatus.DELETED)
+    total_soldout = sum(1 for p in all_products if p.status == ProductStatus.SOLDOUT)
+    
+    # Apply filter to the list
+    if status_filter != "ALL":
+        filtered_products = [p for p in all_products if p.status == status_filter]
+    else:
+        filtered_products = all_products
+    
+    return {
+        "total_products": len(all_products),
+        "total_active": total_active,
+        "total_draft": total_draft,
+        "total_inactive": total_inactive,
+        "total_deleted": total_deleted,
+        "total_soldout": total_soldout,
+        "products": filtered_products
+    }
 
 async def get_all_products(category_filter: str = "ALL"):
     """
