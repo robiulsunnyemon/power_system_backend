@@ -42,6 +42,7 @@ enum Role {
   USER
   SELLER
   SERVICE_PROVIDER
+  ADMIN
 }
 
 enum AccountStatus {
