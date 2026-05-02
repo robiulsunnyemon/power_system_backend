@@ -2,6 +2,98 @@ from app.core.db import db
 from app.modules.users.schemas import UpdateProfileRequest
 from app.common.cloudinary import upload_image, delete_image, get_public_id_from_url
 from fastapi import UploadFile, HTTPException
+from app.modules.products.service import format_product_response
+from prisma.enums import ProductStatus
+
+async def get_seller_public_profile(seller_id: int):
+    """
+    Fetches public profile of a seller including active products, reviews, and stats.
+    """
+    # 1. Fetch Seller with Profile, Active Products, and Received Reviews
+    seller = await db.user.find_unique(
+        where={"id": seller_id},
+        include={
+            "profile": True,
+            "products": {
+                "where": {"status": ProductStatus.ACTIVE},
+                "include": {"category": True, "seller": {"include": {"profile": True}}}
+            },
+            "reviews_received": {
+                "include": {"buyer": {"include": {"profile": True}}}
+            }
+        }
+    )
+    
+    if not seller or seller.role != "SELLER":
+        raise HTTPException(status_code=404, detail="Seller not found")
+        
+    # 2. Calculate Stats
+    raw_score = seller.profile.raw_score if seller.profile else 0
+    trust_score = seller.profile.trust_score if seller.profile else 0
+    
+    # Badge Logic
+    if raw_score >= 800:
+        badge = "Elite"
+    elif raw_score >= 500:
+        badge = "Verified"
+    elif raw_score >= 300:
+        badge = "Trusted"
+    else:
+        badge = "New Member"
+        
+    # Delivery Count
+    from prisma.enums import OrderStatus
+    total_delivery = await db.order.count(
+        where={
+            "product": {"sellerId": seller_id},
+            "status": OrderStatus.DELIVERED
+        }
+    )
+    
+    # Rating Stats
+    ratings = [r.rating for r in seller.reviews_received]
+    avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+    
+    # Positive Percentage (Based on Average Rating)
+    # (avg_rating / 5) * 100 -> Premium logic
+    positive_pct = (avg_rating / 5) * 100 if ratings else 0.0
+    
+    # 3. Format Seller Info
+    seller_info = {
+        "id": seller.id,
+        "fullname": seller.fullname,
+        "displayname": seller.displayname,
+        "profile_image": seller.profile.profile_image if seller.profile else None,
+        "raw_score": raw_score,
+        "trust_score": trust_score,
+        "badge": badge,
+        "total_delivery": total_delivery,
+        "average_rating": round(avg_rating, 1),
+        "positive": round(positive_pct, 1)
+    }
+    
+    # 4. Format Products
+    active_products = [format_product_response(p) for p in seller.products]
+    
+    # 5. Format Reviews
+    reviews = []
+    for r in seller.reviews_received:
+        reviews.append({
+            "id": r.id,
+            "rating": r.rating,
+            "comment": r.comment,
+            "createdAt": r.createdAt,
+            "buyerId": r.buyerId,
+            "sellerId": r.sellerId,
+            "productId": r.productId,
+            "orderId": r.orderId
+        })
+        
+    return {
+        "seller": seller_info,
+        "active_products": active_products,
+        "reviews": reviews
+    }
 
 async def get_user_profile(user_id: int):
     user = await db.user.find_unique(

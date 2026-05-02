@@ -1,6 +1,25 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+from app.modules.products.schemas import ProductResponse
+from app.modules.reviews.schemas import ReviewResponse
+
+class SellerProfileInfo(BaseModel):
+    id: int
+    fullname: str
+    displayname: Optional[str] = None
+    profile_image: Optional[str] = None
+    raw_score: float
+    trust_score: float
+    badge: str
+    total_delivery: int
+    average_rating: float
+    positive: float
+
+class SellerPublicProfileResponse(BaseModel):
+    seller: SellerProfileInfo
+    active_products: List[ProductResponse]
+    reviews: List[ReviewResponse]
 
 class UserProfileResponse(BaseModel):
     id: int

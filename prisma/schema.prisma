@@ -27,6 +27,9 @@ model User {
   profile       UserProfile?
   products      Product[]
   orders        Order[]
+  
+  reviews_given    Review[] @relation("BuyerReviews")
+  reviews_received Review[] @relation("SellerReviews")
 
   @@map("users")
 }
@@ -34,6 +37,8 @@ model User {
 model UserProfile {
   id           Int     @id @default(autoincrement())
   profile_image String?
+  raw_score    Float   @default(0)
+  trust_score  Float   @default(0)
   userId       Int     @unique
   user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -86,6 +91,7 @@ model Product {
   categoryId    Int
   category      Category         @relation(fields: [categoryId], references: [id])
   orders        Order[]
+  reviews       Review[]
 
   @@map("products")
 }
@@ -103,6 +109,7 @@ model Order {
   product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
   
   tracking  OrderTracking[]
+  review    Review?
 
   @@map("orders")
 }
@@ -116,6 +123,28 @@ model OrderTracking {
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@map("order_trackings")
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  rating    Int
+  comment   String?
+  images    String[]
+  createdAt DateTime @default(now())
+
+  buyerId   Int
+  buyer     User     @relation("BuyerReviews", fields: [buyerId], references: [id])
+
+  sellerId  Int
+  seller    User     @relation("SellerReviews", fields: [sellerId], references: [id])
+
+  productId Int
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  orderId   Int      @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
 }
 
 enum OrderStatus {

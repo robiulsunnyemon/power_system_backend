@@ -4,6 +4,7 @@ from typing import List
 from app.modules.orders.schemas import OrderCreate, OrderStatusUpdate
 from app.modules.products.service import format_product_response
 from prisma.enums import OrderStatus
+from app.common.utils import calculate_trust_score
 
 def format_order_response(order):
     """
@@ -167,5 +168,30 @@ async def update_order_status(seller_id: int, order_id: int, data: OrderStatusUp
             "tracking": True
         }
     )
+
+    # 5. Update Seller Trust Score on Delivery
+    if data.status == OrderStatus.DELIVERED:
+        # Fetch current profile or assume 0 if not exists
+        profile = await db.userprofile.find_unique(where={"userId": order.product.sellerId})
+        current_raw = profile.raw_score if profile else 0
+        
+        new_raw = current_raw + 200
+        new_trust = calculate_trust_score(new_raw)
+        
+        # Use upsert to handle cases where profile doesn't exist
+        await db.userprofile.upsert(
+            where={"userId": order.product.sellerId},
+            data={
+                "create": {
+                    "userId": order.product.sellerId,
+                    "raw_score": new_raw,
+                    "trust_score": new_trust
+                },
+                "update": {
+                    "raw_score": new_raw,
+                    "trust_score": new_trust
+                }
+            }
+        )
     
     return format_order_response(updated_order)
