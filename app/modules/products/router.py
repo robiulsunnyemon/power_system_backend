@@ -62,3 +62,16 @@ async def list_categories():
     Public endpoint to list all available categories.
     """
     return await service.get_all_categories()
+
+@router.delete("/products/{product_id}")
+async def delete_product(
+    product_id: int,
+    hard_delete: bool = False,
+    seller_id: int = Depends(check_seller_role)
+):
+    """
+    Endpoint for sellers to delete their product.
+    - default: soft delete (status = DELETED)
+    - hard_delete=true: permanent removal
+    """
+    return await service.delete_product(seller_id, product_id, hard_delete)

@@ -28,6 +28,8 @@ class ProductCreate(BaseModel):
     description: str
     category: str  # Category name
     price: float
+    tax_fee: Optional[float] = 0
+    delivery_fee: Optional[float] = 0
     condition: ProductCondition
     images: List[str]  # List of Cloudinary URLs
     longitude: Optional[float] = None
@@ -42,6 +44,9 @@ class ProductResponse(BaseModel):
     description: str
     images: List[str]
     price: float
+    tax_fee: Optional[float] = 0
+    delivery_fee: Optional[float] = 0
+    total_fee: float
     condition: ProductCondition
     status: ProductStatus
     longitude: Optional[float] = None

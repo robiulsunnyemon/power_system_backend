@@ -51,12 +51,20 @@ async def create_product(seller_id: int, data: ProductCreate):
         }
     )
             
-    # 3. Create Product
+    # 3. Calculate total_fee
+    tax = data.tax_fee or 0
+    delivery = data.delivery_fee or 0
+    total_fee = data.price + tax + delivery
+            
+    # 4. Create Product
     product = await db.product.create(
         data={
             "title": data.title,
             "description": data.description,
             "price": data.price,
+            "tax_fee": tax,
+            "delivery_fee": delivery,
+            "total_fee": total_fee,
             "condition": data.condition,
             "longitude": data.longitude,
             "latitude": data.latitude,
@@ -125,3 +133,28 @@ async def get_all_categories():
     Returns all available categories.
     """
     return await db.category.find_many(order={"name": "asc"})
+
+async def delete_product(seller_id: int, product_id: int, hard_delete: bool = False):
+    """
+    Deletes a product.
+    - Soft delete: Sets status to DELETED.
+    - Hard delete: Removes from DB.
+    Verifies that the product belongs to the seller.
+    """
+    product = await db.product.find_unique(where={"id": product_id})
+    
+    if not product or product.sellerId != seller_id:
+        raise HTTPException(
+            status_code=404, 
+            detail="Product not found or access denied"
+        )
+    
+    if hard_delete:
+        await db.product.delete(where={"id": product_id})
+        return {"message": "Product permanently deleted from database"}
+    else:
+        await db.product.update(
+            where={"id": product_id},
+            data={"status": ProductStatus.DELETED}
+        )
+        return {"message": "Product status updated to DELETED (soft delete)"}

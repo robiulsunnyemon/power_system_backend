@@ -69,6 +69,9 @@ model Product {
   description   String
   images        String[]
   price         Float
+  tax_fee       Float?           @default(0)
+  delivery_fee  Float?           @default(0)
+  total_fee     Float            @default(0)
   condition     ProductCondition
   status        ProductStatus    @default(ACTIVE)
   longitude     Float?
