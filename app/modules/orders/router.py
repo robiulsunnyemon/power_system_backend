@@ -9,7 +9,7 @@ router = APIRouter(prefix="/orders")
 # Dependency to check if user is a SELLER
 async def check_seller_role(user_id: int = Depends(get_current_user_id)):
     user = await db.user.find_unique(where={"id": user_id})
-    if not user or user.role != "SELLER":
+    if not user or "SELLER" not in user.roles:
         raise HTTPException(
             status_code=403, 
             detail="Only sellers can perform this action"

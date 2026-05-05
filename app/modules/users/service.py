@@ -24,7 +24,7 @@ async def get_seller_public_profile(seller_id: int):
         }
     )
     
-    if not seller or seller.role != "SELLER":
+    if not seller or "SELLER" not in seller.roles:
         raise HTTPException(status_code=404, detail="Seller not found")
         
     # 2. Calculate Stats
@@ -164,3 +164,71 @@ async def delete_profile_image(user_id: int):
     )
     
     return await get_user_profile(user_id)
+
+async def become_seller(user_id: int):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    updated_roles = user.roles
+    message = "Already a SELLER. Returning a new token."
+    
+    if "SELLER" not in user.roles:
+        updated_roles = user.roles + ["SELLER"]
+        message = "Successfully upgraded to SELLER"
+        
+    # Always increment tokenVersion to invalidate old tokens
+    new_token_version = user.tokenVersion + 1
+    
+    await db.user.update(
+        where={"id": user_id},
+        data={
+            "roles": {"set": updated_roles},
+            "tokenVersion": new_token_version
+        }
+    )
+    
+    from app.common.security import create_access_token
+    new_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+    )
+    
+    return {
+        "message": message,
+        "access_token": new_token,
+        "token_type": "bearer"
+    }
+
+async def become_service_provider(user_id: int):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    updated_roles = user.roles
+    message = "Already a SERVICE_PROVIDER. Returning a new token."
+    
+    if "SERVICE_PROVIDER" not in user.roles:
+        updated_roles = user.roles + ["SERVICE_PROVIDER"]
+        message = "Successfully upgraded to SERVICE_PROVIDER"
+        
+    # Always increment tokenVersion to invalidate old tokens
+    new_token_version = user.tokenVersion + 1
+    
+    await db.user.update(
+        where={"id": user_id},
+        data={
+            "roles": {"set": updated_roles},
+            "tokenVersion": new_token_version
+        }
+    )
+    
+    from app.common.security import create_access_token
+    new_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+    )
+    
+    return {
+        "message": message,
+        "access_token": new_token,
+        "token_type": "bearer"
+    }

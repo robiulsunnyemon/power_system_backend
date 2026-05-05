@@ -31,7 +31,7 @@ async def seed_admin():
                     "fullname": "Admin User",
                     "email": email,
                     "password": hashed_pwd,
-                    "role": Role.ADMIN,
+                    "roles": [Role.ADMIN],
                     "isVerified": True,
                     "accountStatus": AccountStatus.ACTIVE,
                     "isAgreed": True

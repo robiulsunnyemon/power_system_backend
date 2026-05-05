@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.modules.users import service
 from app.modules.users import service, schemas
 from app.common.security import decode_token
+from app.core.db import db
 
 router = APIRouter(prefix="/users", tags=["Users"])
 security = HTTPBearer()
@@ -12,7 +12,18 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    return int(payload.get("sub"))
+    
+    user_id = int(payload.get("sub"))
+    token_version = payload.get("token_version")
+    
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        
+    if user.tokenVersion != token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been invalidated. Please login again.")
+        
+    return user_id
 
 @router.get("/profile", response_model=schemas.UserProfileResponse)
 async def get_profile(user_id: int = Depends(get_current_user_id)):
@@ -39,3 +50,17 @@ async def upload_profile_image(file: UploadFile = File(...), user_id: int = Depe
 @router.delete("/profile/image", response_model=schemas.UserProfileResponse)
 async def delete_profile_image(user_id: int = Depends(get_current_user_id)):
     return await service.delete_profile_image(user_id)
+
+@router.post("/become-seller")
+async def become_seller(user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint for a regular user to upgrade to a SELLER role.
+    """
+    return await service.become_seller(user_id)
+
+@router.post("/become-service-provider")
+async def become_service_provider(user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint for a regular user to upgrade to a SERVICE_PROVIDER role.
+    """
+    return await service.become_service_provider(user_id)

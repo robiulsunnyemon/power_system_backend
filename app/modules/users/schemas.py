@@ -27,7 +27,7 @@ class UserProfileResponse(BaseModel):
     email: EmailStr
     isVerified: bool
     accountStatus: str
-    role: str
+    roles: List[str]
     displayname: Optional[str] = None
     bio: Optional[str] = None
     longitude: Optional[float] = None

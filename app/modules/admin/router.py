@@ -21,7 +21,7 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     user_id = int(payload.get("sub"))
     user = await db.user.find_unique(where={"id": user_id})
     
-    if not user or user.role != "ADMIN":
+    if not user or "ADMIN" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Only admins can access this resource"

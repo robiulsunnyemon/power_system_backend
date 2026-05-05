@@ -12,7 +12,7 @@ async def check_seller_role(user_id: int = Depends(get_current_user_id)):
     Dependency to verify if the user has the SELLER role.
     """
     user = await db.user.find_unique(where={"id": user_id})
-    if not user or user.role != "SELLER":
+    if not user or "SELLER" not in user.roles:
         raise HTTPException(
             status_code=403, 
             detail="Only sellers can perform this action"

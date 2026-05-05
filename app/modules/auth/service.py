@@ -23,7 +23,7 @@ async def signup_user(data: SignupRequest, background_tasks: BackgroundTasks):
             "email": data.email,
             "password": hashed_pwd,
             "isAgreed": data.isAgreed,
-            "role": data.role.value,
+            "roles": [r.value for r in data.roles],
             "otp": otp,
             "isVerified": False,
             "accountStatus": AccountStatus.PENDING
@@ -82,7 +82,7 @@ async def login_user(data: LoginRequest):
     if user.accountStatus != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail=f"Account is {user.accountStatus}")
     
-    token = create_access_token(data={"sub": str(user.id), "email": user.email})
+    token = create_access_token(data={"sub": str(user.id), "email": user.email, "roles": user.roles, "token_version": user.tokenVersion})
     return {"access_token": token, "token_type": "bearer"}
 
 async def forget_password(email: str, background_tasks: BackgroundTasks):

@@ -35,7 +35,7 @@ async def seed_users():
                         "fullname": fullname,
                         "email": email,
                         "password": hashed_pwd,
-                        "role": Role.USER,
+                        "roles": [Role.USER],
                         "isVerified": True,
                         "accountStatus": AccountStatus.ACTIVE,
                         "isAgreed": True

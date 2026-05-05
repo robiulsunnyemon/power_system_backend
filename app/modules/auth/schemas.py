@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Optional
+from typing import Optional, List
 from enum import Enum
 
 class Role(str, Enum):
@@ -13,7 +13,7 @@ class SignupRequest(BaseModel):
     password: str = Field(..., min_length=6)
     confirm_password: str
     isAgreed: bool
-    role: Role = Role.USER
+    roles: List[Role] = [Role.USER]
 
 
 class VerifyOTPRequest(BaseModel):

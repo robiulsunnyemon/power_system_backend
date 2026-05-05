@@ -14,7 +14,7 @@ model User {
   email         String        @unique
   password      String
   isAgreed      Boolean       @default(false)
-  role          Role          @default(USER)
+  roles         Role[]        @default([USER])
   isVerified    Boolean       @default(false)
   accountStatus AccountStatus @default(PENDING)
   otp           String?
@@ -22,6 +22,7 @@ model User {
   bio           String?
   longitude     Float?
   latitude      Float?
+  tokenVersion  Int           @default(1)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   profile       UserProfile?

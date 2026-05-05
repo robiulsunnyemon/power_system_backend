@@ -35,7 +35,7 @@ async def seed_sellers():
                         "fullname": fullname,
                         "email": email,
                         "password": hashed_pwd,
-                        "role": Role.SELLER,
+                        "roles": [Role.SELLER],
                         "isVerified": True,
                         "accountStatus": AccountStatus.ACTIVE,
                         "isAgreed": True

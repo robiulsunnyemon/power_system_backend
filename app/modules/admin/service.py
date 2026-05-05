@@ -10,7 +10,7 @@ async def get_all_users(role_filter: UserRoleFilter):
     query = {}
     if role_filter != UserRoleFilter.ALL:
         # Map the filter enum to the Prisma Role enum
-        query["role"] = Role(role_filter.value)
+        query["roles"] = {"has": Role(role_filter.value)}
     
     users = await db.user.find_many(
         where=query,
