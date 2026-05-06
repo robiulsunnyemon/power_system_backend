@@ -78,6 +78,15 @@ async def get_seller_public_profile(seller_id: int):
     # 5. Format Reviews
     reviews = []
     for r in seller.reviews_received:
+        # Get reviewer name (prefer displayname, fallback to fullname)
+        reviewer_name = r.buyer.displayname if r.buyer.displayname else r.buyer.fullname
+        
+        # Get reviewer role (primary role)
+        reviewer_role = r.buyer.roles[0] if r.buyer.roles else "USER"
+        
+        # Get reviewer image
+        reviewer_image = r.buyer.profile.profile_image if r.buyer.profile else None
+
         reviews.append({
             "id": r.id,
             "rating": r.rating,
@@ -86,7 +95,10 @@ async def get_seller_public_profile(seller_id: int):
             "buyerId": r.buyerId,
             "sellerId": r.sellerId,
             "productId": r.productId,
-            "orderId": r.orderId
+            "orderId": r.orderId,
+            "reviewer_name": reviewer_name,
+            "reviewer_role": reviewer_role,
+            "reviewer_image": reviewer_image
         })
         
     return {
