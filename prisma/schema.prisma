@@ -28,6 +28,9 @@ model User {
   profile       UserProfile?
   products      Product[]
   orders        Order[]
+
+  services             Service[]            @relation("ProviderServices")
+  serviceApplications  ServiceApplication[] @relation("ClientApplications")
   
   reviews_given    Review[] @relation("BuyerReviews")
   reviews_received Review[] @relation("SellerReviews")
@@ -197,5 +200,82 @@ enum ProductStatus {
   DELETED
   INACTIVE
   SOLDOUT
+}
+
+model Service {
+  id            Int           @id @default(autoincrement())
+  title         String
+  description   String
+  price         Float
+  pricingType   PricingType   @default(FIXED)
+  longitude     Float?
+  latitude      Float?
+  requirements  Json?         // List of objects {title, description}
+  availability  Json?         // e.g. ["M", "T", "W"]
+  images        String[]
+  status        ServiceStatus @default(DRAFT)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  providerId    Int
+  provider      User          @relation("ProviderServices", fields: [providerId], references: [id], onDelete: Cascade)
+
+  category      String?
+  
+  applications  ServiceApplication[]
+
+  @@map("services")
+}
+
+model ServiceApplication {
+  id                Int               @id @default(autoincrement())
+  proposedRate      Float
+  expectedStartDate DateTime
+  coverLetter       String
+  status            ApplicationStatus @default(PENDING)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  serviceId         Int
+  service           Service           @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  clientId          Int
+  client            User                  @relation("ClientApplications", fields: [clientId], references: [id], onDelete: Cascade)
+
+  tracking          ApplicationTracking[]
+
+  @@map("service_applications")
+}
+
+model ApplicationTracking {
+  id            Int                @id @default(autoincrement())
+  status        String
+  createdAt     DateTime           @default(now())
+  
+  applicationId Int
+  application   ServiceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("application_trackings")
+}
+
+
+
+enum PricingType {
+  HOURLY
+  FIXED
+}
+
+enum ServiceStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  CLOSED
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  COMPLETED
 }
 
