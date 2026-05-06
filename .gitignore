@@ -29,3 +29,4 @@ var/
 htmlcov/
 .prisma/
 generated/
+*.iml

@@ -42,7 +42,20 @@ async def create_review(buyer_id: int, data: ReviewCreate):
     if order.review:
         raise HTTPException(status_code=400, detail="This order has already been reviewed")
         
-    # 4. Create Review
+    # 4. Check if buyer has already reviewed this product (One review per product restriction)
+    existing_review = await db.review.find_first(
+        where={
+            "buyerId": buyer_id,
+            "productId": order.productId
+        }
+    )
+    if existing_review:
+        raise HTTPException(
+            status_code=400, 
+            detail="You have already reviewed this product. Only one review per product is allowed."
+        )
+        
+    # 5. Create Review
     review = await db.review.create(
         data={
             "rating": data.rating,
@@ -55,7 +68,7 @@ async def create_review(buyer_id: int, data: ReviewCreate):
         }
     )
     
-    # 5. Update Seller Trust Score
+    # 6. Update Seller Trust Score
     profile = await db.userprofile.find_unique(where={"userId": order.product.sellerId})
     current_raw = profile.raw_score if profile else 0
     

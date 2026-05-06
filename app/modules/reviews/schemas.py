@@ -15,12 +15,15 @@ class ReviewResponse(BaseModel):
     id: int
     rating: int
     comment: Optional[str]
-    images: List[str]
+    images: Optional[List[str]] = []
     createdAt: datetime
     buyerId: int
     sellerId: int
     productId: int
     orderId: int
+    reviewer_name: Optional[str] = None
+    reviewer_role: Optional[str] = None
+    reviewer_image: Optional[str] = None
 
     class Config:
         from_attributes = True
