@@ -41,6 +41,8 @@ model User {
   reportsMade       UserReport[] @relation("ReporterRelation")
   reportsReceived   UserReport[] @relation("ReportedUserRelation")
 
+  bugReports        BugReport[]
+
   @@map("users")
 }
 
@@ -296,6 +298,48 @@ model Setting {
   updatedAt DateTime    @updatedAt
 
   @@map("settings")
+}
+
+enum BugCategory {
+  MARKETPLACE_GLITCH
+  PAYMENT_ISSUE
+  ACCOUNT_PROBLEM
+  OTHER
+}
+
+enum BugSeverity {
+  MINOR_AESTHETIC
+  FUNCTIONAL_BUG
+  CRITICAL_FAILURE
+}
+
+enum BugStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+model BugReport {
+  id               Int         @id @default(autoincrement())
+  subject          String
+  category         BugCategory
+  severity         BugSeverity
+  description      String      @db.Text
+  attachmentUrl    String?
+  
+  deviceModel      String?
+  browserVersion   String?
+  sessionId        String?
+  
+  status           BugStatus   @default(PENDING)
+  
+  userId           Int
+  reporter         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@map("bug_reports")
 }
 
 enum ReportReason {
