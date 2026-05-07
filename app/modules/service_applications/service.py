@@ -2,7 +2,7 @@ from app.core.db import db
 from fastapi import HTTPException
 from typing import List
 from app.modules.service_applications.schemas import ServiceApplicationCreate, ServiceApplicationStatusUpdate
-from prisma.enums import ApplicationStatus
+from prisma.enums import ApplicationStatus, ServiceStatus
 
 def format_application_response(app):
     """
@@ -114,12 +114,44 @@ async def update_application_status(provider_id: int, application_id: int, data:
     if not application or application.service.providerId != provider_id:
         raise HTTPException(status_code=404, detail="Application not found or access denied")
 
+    if data.status == ApplicationStatus.ACCEPTED or str(data.status) == "ACCEPTED":
+        # Find other pending applications to decline and add tracking
+        other_apps = await db.serviceapplication.find_many(
+            where={
+                "serviceId": application.serviceId,
+                "status": ApplicationStatus.PENDING
+            }
+        )
+        
+        for other_app in other_apps:
+            if other_app.id != application_id:
+                await db.serviceapplication.update(
+                    where={"id": other_app.id},
+                    data={
+                        "status": ApplicationStatus.DECLINED,
+                        "tracking": {
+                            "create": {"status": "DECLINED"}
+                        }
+                    }
+                )
+            
+        # Update service status to CLOSED
+        await db.service.update(
+            where={"id": application.serviceId},
+            data={"status": ServiceStatus.CLOSED}
+        )
+
+    # Determine status string for tracking
+    status_str = data.status.name if hasattr(data.status, "name") else str(data.status)
+    if isinstance(data.status, str) and "." in data.status:
+        status_str = data.status.split(".")[-1] # handle ApplicationStatus.ACCEPTED as string
+
     updated_app = await db.serviceapplication.update(
         where={"id": application_id},
         data={
             "status": data.status,
             "tracking": {
-                "create": {"status": data.status.name}
+                "create": {"status": status_str}
             }
         },
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True}

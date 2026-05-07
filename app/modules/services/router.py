@@ -32,7 +32,7 @@ async def create_service_endpoint(
 
 @router.get("/my-services", response_model=ServiceListResponse,status_code=status.HTTP_200_OK)
 async def get_my_services_endpoint(
-    status: str = Query("ALL", description="Filter by status (ALL, DRAFT, PUBLISHED, etc.)"),
+    status: str = Query("ALL", description="Filter by status (ALL, DRAFT, PUBLISHED, PAUSED, CLOSED.)"),
     provider_id: int = Depends(check_provider_role)
 ):
     return await get_provider_services(provider_id, status)
