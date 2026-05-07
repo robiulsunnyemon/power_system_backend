@@ -49,3 +49,20 @@ async def update_status(
     Endpoint to update a user's account status.
     """
     return await service.update_user_status(user_id, data.accountStatus)
+
+@router.get("/dashboard/stats", response_model=schemas.DashboardStatsResponse)
+async def get_stats(admin=Depends(get_current_admin)):
+    """
+    Admin dashboard: Get user counts and growth percentages.
+    """
+    return await service.get_dashboard_stats()
+
+@router.get("/dashboard/growth", response_model=schemas.GrowthResponse)
+async def get_growth(
+    filter: schemas.GrowthFilter = schemas.GrowthFilter.WEEKLY,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin dashboard: Get user growth data points for charts.
+    """
+    return await service.get_user_growth(filter)
