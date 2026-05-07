@@ -57,12 +57,16 @@ async def place_order(user_id: int, data: OrderCreate):
     
     return format_order_response(order)
 
-async def get_buyer_orders(user_id: int):
+async def get_buyer_orders(user_id: int, status_filter: str = "ALL"):
     """
-    Returns all orders placed by a specific buyer with tracking.
+    Returns all orders placed by a specific buyer with tracking, optionally filtered by status.
     """
+    where = {"userId": user_id}
+    if status_filter != "ALL":
+        where["status"] = status_filter
+
     orders = await db.order.find_many(
-        where={"userId": user_id},
+        where=where,
         include={
             "product": {"include": {"category": True, "seller": {"include": {"profile": True}}}},
             "tracking": True
@@ -71,16 +75,20 @@ async def get_buyer_orders(user_id: int):
     )
     return [format_order_response(o) for o in orders]
 
-async def get_seller_all_orders(seller_id: int):
+async def get_seller_all_orders(seller_id: int, status_filter: str = "ALL"):
     """
-    Returns all orders for all products belonging to a specific seller with tracking.
+    Returns all orders for all products belonging to a specific seller with tracking, optionally filtered by status.
     """
+    where = {
+        "product": {
+            "sellerId": seller_id
+        }
+    }
+    if status_filter != "ALL":
+        where["status"] = status_filter
+
     orders = await db.order.find_many(
-        where={
-            "product": {
-                "sellerId": seller_id
-            }
-        },
+        where=where,
         include={
             "product": {"include": {"category": True, "seller": {"include": {"profile": True}}}},
             "user": {"include": {"profile": True}},

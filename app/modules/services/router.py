@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
 from typing import List
 from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse
 from app.modules.services.service import (
-    create_service, get_provider_services, get_all_services, update_service, delete_service
+    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -42,6 +42,12 @@ async def get_all_services_endpoint(
     category: str = Query("ALL", description="Filter by category name")
 ):
     return await get_all_services(category)
+
+@router.get("/{service_id}", response_model=ServiceResponse, status_code=status.HTTP_200_OK)
+async def get_service_by_id_endpoint(
+    service_id: int = Path(..., title="The ID of the service to get")
+):
+    return await get_service_by_id(service_id)
 
 @router.patch("/{service_id}", response_model=ServiceResponse,status_code=status.HTTP_200_OK)
 async def update_service_endpoint(

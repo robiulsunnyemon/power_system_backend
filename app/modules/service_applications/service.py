@@ -75,11 +75,14 @@ async def apply_for_service(client_id: int, service_id: int, data: ServiceApplic
     )
     return format_application_response(application)
 
-async def get_service_applications(provider_id: int, service_id: int = None):
+async def get_service_applications(provider_id: int, service_id: int = None, status: ApplicationStatus = ApplicationStatus.PENDING):
     """
     Returns applications for a provider's services.
     """
-    where = {"service": {"providerId": provider_id}}
+    where = {
+        "service": {"providerId": provider_id},
+        "status": status
+    }
     if service_id:
         where["serviceId"] = service_id
 

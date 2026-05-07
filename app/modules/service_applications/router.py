@@ -6,7 +6,7 @@ from app.modules.service_applications.service import (
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
-from prisma.enums import Role
+from prisma.enums import Role, ApplicationStatus
 
 router = APIRouter(prefix="/service-applications", tags=["Service Applications"])
 
@@ -39,9 +39,10 @@ async def get_my_applications_endpoint(
 @router.get("/provider/requests", response_model=List[ServiceApplicationResponse])
 async def get_provider_requests_endpoint(
     service_id: Optional[int] = Query(None, description="Filter requests by a specific service"),
+    status: ApplicationStatus = Query(ApplicationStatus.PENDING, description="Filter requests by status (PENDING, ACCEPTED, DECLINED, COMPLETED)"),
     provider_id: int = Depends(check_provider_role)
 ):
-    return await get_service_applications(provider_id, service_id)
+    return await get_service_applications(provider_id, service_id, status)
 
 @router.patch("/provider/requests/{application_id}/status", response_model=ServiceApplicationResponse)
 async def update_request_status_endpoint(

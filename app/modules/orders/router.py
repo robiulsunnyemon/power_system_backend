@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List
 from app.modules.orders import service, schemas
 from app.modules.users.router import get_current_user_id
@@ -29,21 +29,27 @@ async def create_order(
     return await service.place_order(user_id, data)
 
 @router.get("/my", response_model=List[schemas.OrderResponse], tags=["Orders - Buyer"])
-async def list_my_orders(user_id: int = Depends(get_current_user_id)):
+async def list_my_orders(
+    status: schemas.OrderStatusFilter = Query(schemas.OrderStatusFilter.ALL),
+    user_id: int = Depends(get_current_user_id)
+):
     """
     Endpoint for buyers to see their own orders.
     """
-    return await service.get_buyer_orders(user_id)
+    return await service.get_buyer_orders(user_id, status)
 
 
 # --- SELLERS ENDPOINTS ---
 
 @router.get("/seller/all", response_model=List[schemas.OrderResponse], tags=["Orders - Seller"])
-async def list_all_seller_orders(seller_id: int = Depends(check_seller_role)):
+async def list_all_seller_orders(
+    status: schemas.OrderStatusFilter = Query(schemas.OrderStatusFilter.ALL),
+    seller_id: int = Depends(check_seller_role)
+):
     """
     Endpoint for sellers to see all orders for all of their products.
     """
-    return await service.get_seller_all_orders(seller_id)
+    return await service.get_seller_all_orders(seller_id, status)
 
 @router.get("/seller/product/{product_id}", response_model=schemas.ProductOrdersResponse, tags=["Orders - Seller"])
 async def list_orders_by_product(

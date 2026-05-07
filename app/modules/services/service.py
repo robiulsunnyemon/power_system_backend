@@ -96,6 +96,20 @@ async def get_all_services(category_filter: str = "ALL"):
     
     return [format_service_response(s) for s in services]
 
+async def get_service_by_id(service_id: int):
+    """
+    Returns a single service by ID (public endpoint).
+    """
+    service = await db.service.find_unique(
+        where={"id": service_id},
+        include={"provider": {"include": {"profile": True}}}
+    )
+    
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+        
+    return format_service_response(service)
+
 async def update_service(provider_id: int, service_id: int, data: ServiceUpdate):
     """
     Updates an existing service.
