@@ -64,3 +64,10 @@ async def become_service_provider(user_id: int = Depends(get_current_user_id)):
     Endpoint for a regular user to upgrade to a SERVICE_PROVIDER role.
     """
     return await service.become_service_provider(user_id)
+
+@router.post("/become-user")
+async def become_user(user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint for a user to ensure they have the base USER role and get a fresh token.
+    """
+    return await service.become_user(user_id)

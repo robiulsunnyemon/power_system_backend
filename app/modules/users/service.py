@@ -244,3 +244,40 @@ async def become_service_provider(user_id: int):
         "access_token": new_token,
         "token_type": "bearer"
     }
+
+async def become_user(user_id: int):
+    """
+    Endpoint for a user to ensure they have the base USER role and get a fresh token.
+    """
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    updated_roles = user.roles
+    message = "Already a USER. Returning a new token."
+    
+    if "USER" not in user.roles:
+        updated_roles = user.roles + ["USER"]
+        message = "Successfully added USER role"
+        
+    # Always increment tokenVersion to invalidate old tokens
+    new_token_version = user.tokenVersion + 1
+    
+    await db.user.update(
+        where={"id": user_id},
+        data={
+            "roles": {"set": updated_roles},
+            "tokenVersion": new_token_version
+        }
+    )
+    
+    from app.common.security import create_access_token
+    new_token = create_access_token(
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+    )
+    
+    return {
+        "message": message,
+        "access_token": new_token,
+        "token_type": "bearer"
+    }
