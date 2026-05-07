@@ -1,10 +1,11 @@
 from app.core.db import db
 from fastapi import HTTPException
 from typing import List
-from app.modules.orders.schemas import OrderCreate, OrderStatusUpdate
+from app.modules.orders import schemas
 from app.modules.products.service import format_product_response
-from prisma.enums import OrderStatus
+from prisma.enums import OrderStatus, ProductStatus
 from app.common.utils import calculate_trust_score
+from datetime import datetime, timedelta, timezone
 
 def format_order_response(order):
     """
@@ -27,7 +28,7 @@ def format_order_response(order):
         
     return order_dict
 
-async def place_order(user_id: int, data: OrderCreate):
+async def place_order(user_id: int, data: schemas.OrderCreate):
     """
     Places a new order and adds initial tracking: ORDERPLACE, ORDER PENDING.
     """
@@ -135,7 +136,7 @@ async def get_orders_by_product(seller_id: int, product_id: int, status_filter: 
         "orders": [format_order_response(o) for o in filtered_orders]
     }
 
-async def update_order_status(seller_id: int, order_id: int, data: OrderStatusUpdate):
+async def update_order_status(seller_id: int, order_id: int, data: schemas.OrderStatusUpdate):
     """
     Updates order status and adds tracking: 
     - ACCEPTED -> ORDER CONFIRM
@@ -203,3 +204,148 @@ async def update_order_status(seller_id: int, order_id: int, data: OrderStatusUp
         )
     
     return format_order_response(updated_order)
+
+async def get_seller_dashboard_stats(seller_id: int):
+    """
+    Calculates seller performance metrics including lifetime total revenue, 
+    active products, pending orders, and revenue growth compared to last month.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # --- 1. Total Revenue (Lifetime) ---
+    delivered_orders = await db.order.find_many(
+        where={
+            "product": {"sellerId": seller_id},
+            "status": OrderStatus.DELIVERED
+        },
+        include={"product": True}
+    )
+    total_revenue = sum(o.product.total_fee for o in delivered_orders)
+
+    # --- 2. Operational Counts ---
+    total_active_products = await db.product.count(
+        where={
+            "sellerId": seller_id,
+            "status": ProductStatus.ACTIVE
+        }
+    )
+
+    total_pending_orders = await db.order.count(
+        where={
+            "product": {"sellerId": seller_id},
+            "status": OrderStatus.PENDING
+        }
+    )
+
+    # --- 3. Revenue Growth (Current Month vs Last Month) ---
+    first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    if first_day_this_month.month == 1:
+        first_day_last_month = first_day_this_month.replace(year=first_day_this_month.year - 1, month=12)
+    else:
+        first_day_last_month = first_day_this_month.replace(month=first_day_this_month.month - 1)
+    
+    last_day_last_month = first_day_this_month - timedelta(seconds=1)
+
+    # Revenue this month
+    this_month_orders = [o for o in delivered_orders if o.createdAt >= first_day_this_month]
+    revenue_this_month = sum(o.product.total_fee for o in this_month_orders)
+
+    # Revenue last month
+    last_month_orders = [o for o in delivered_orders if first_day_last_month <= o.createdAt <= last_day_last_month]
+    revenue_last_month = sum(o.product.total_fee for o in last_month_orders)
+
+    # Calculate growth %
+    if revenue_last_month == 0:
+        growth_pct = 100.0 if revenue_this_month > 0 else 0.0
+    else:
+        growth_pct = round(((revenue_this_month - revenue_last_month) / revenue_last_month) * 100, 2)
+
+    return {
+        "total_revenue": total_revenue,
+        "total_active_products": total_active_products,
+        "total_pending_orders": total_pending_orders,
+        "revenue_growth_pct": growth_pct
+    }
+
+async def get_seller_revenue_growth(seller_id: int, filter_type: schemas.GrowthFilter):
+    """
+    Returns revenue data points for charting based on the selected filter.
+    """
+    now = datetime.now(timezone.utc)
+    data_points = []
+
+    if filter_type == schemas.GrowthFilter.WEEKLY:
+        for i in range(6, -1, -1):
+            day = now - timedelta(days=i)
+            start_date = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = day.replace(hour=23, minute=59, second=59, microsecond=999999)
+            orders = await db.order.find_many(
+                where={
+                    "product": {"sellerId": seller_id},
+                    "status": OrderStatus.DELIVERED,
+                    "createdAt": {"gte": start_date, "lte": end_date}
+                },
+                include={"product": True}
+            )
+            revenue = sum(o.product.total_fee for o in orders)
+            data_points.append({"label": day.strftime("%a"), "revenue": revenue})
+
+    elif filter_type == schemas.GrowthFilter.MONTHLY:
+        for i in range(29, -1, -1):
+            day = now - timedelta(days=i)
+            start_date = day.replace(hour=0, minute=0, second=0, microsecond=0)
+            end_date = day.replace(hour=23, minute=59, second=59, microsecond=999999)
+            orders = await db.order.find_many(
+                where={
+                    "product": {"sellerId": seller_id},
+                    "status": OrderStatus.DELIVERED,
+                    "createdAt": {"gte": start_date, "lte": end_date}
+                },
+                include={"product": True}
+            )
+            revenue = sum(o.product.total_fee for o in orders)
+            data_points.append({"label": day.strftime("%d %b"), "revenue": revenue})
+
+    elif filter_type in [schemas.GrowthFilter.SIX_MONTHS, schemas.GrowthFilter.YEARLY]:
+        months_to_show = 6 if filter_type == schemas.GrowthFilter.SIX_MONTHS else 12
+        for i in range(months_to_show - 1, -1, -1):
+            target_month = now.month - i
+            target_year = now.year
+            while target_month <= 0:
+                target_month += 12
+                target_year -= 1
+            
+            month_start = datetime(target_year, target_month, 1)
+            if target_month == 12:
+                next_month_start = datetime(target_year + 1, 1, 1)
+            else:
+                next_month_start = datetime(target_year, target_month + 1, 1)
+                
+            orders = await db.order.find_many(
+                where={
+                    "product": {"sellerId": seller_id},
+                    "status": OrderStatus.DELIVERED,
+                    "createdAt": {"gte": month_start, "lt": next_month_start}
+                },
+                include={"product": True}
+            )
+            revenue = sum(o.product.total_fee for o in orders)
+            data_points.append({"label": month_start.strftime("%b %y"), "revenue": revenue})
+
+    elif filter_type == schemas.GrowthFilter.YEAR_RANGE:
+        for i in range(4, -1, -1):
+            year_start = datetime(now.year - i, 1, 1)
+            year_end = datetime(now.year - i + 1, 1, 1)
+            orders = await db.order.find_many(
+                where={
+                    "product": {"sellerId": seller_id},
+                    "status": OrderStatus.DELIVERED,
+                    "createdAt": {"gte": year_start, "lt": year_end}
+                },
+                include={"product": True}
+            )
+            revenue = sum(o.product.total_fee for o in orders)
+            data_points.append({"label": str(year_start.year), "revenue": revenue})
+
+    return {"data": data_points}

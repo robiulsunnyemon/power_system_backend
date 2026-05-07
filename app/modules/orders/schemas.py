@@ -48,3 +48,23 @@ class ProductOrdersResponse(BaseModel):
     total_accept_order: int
     total_pending_order: int
     orders: List[OrderResponse]
+
+class GrowthFilter(str, Enum):
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    SIX_MONTHS = "6months"
+    YEARLY = "yearly"
+    YEAR_RANGE = "year_range"
+
+class RevenueGrowthDataPoint(BaseModel):
+    label: str
+    revenue: float
+
+class RevenueGrowthResponse(BaseModel):
+    data: List[RevenueGrowthDataPoint]
+
+class SellerDashboardStats(BaseModel):
+    total_revenue: float
+    total_active_products: int
+    total_pending_orders: int
+    revenue_growth_pct: float

@@ -72,3 +72,22 @@ async def update_status(
     Endpoint for sellers to accept or cancel an order.
     """
     return await service.update_order_status(seller_id, order_id, data)
+
+@router.get("/seller/dashboard/stats", response_model=schemas.SellerDashboardStats, tags=["Orders - Seller"])
+async def get_seller_stats(
+    seller_id: int = Depends(check_seller_role)
+):
+    """
+    Endpoint for sellers to see their lifetime dashboard statistics.
+    """
+    return await service.get_seller_dashboard_stats(seller_id)
+
+@router.get("/seller/dashboard/revenue-growth", response_model=schemas.RevenueGrowthResponse, tags=["Orders - Seller"])
+async def get_seller_revenue_growth(
+    filter: schemas.GrowthFilter = Query(schemas.GrowthFilter.WEEKLY),
+    seller_id: int = Depends(check_seller_role)
+):
+    """
+    Endpoint for sellers to see their revenue growth data points for charts.
+    """
+    return await service.get_seller_revenue_growth(seller_id, filter)

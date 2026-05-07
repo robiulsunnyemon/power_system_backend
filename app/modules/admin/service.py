@@ -2,7 +2,7 @@ from app.core.db import db
 from prisma.enums import Role, AccountStatus
 from app.modules.admin.schemas import UserRoleFilter, GrowthFilter
 from fastapi import HTTPException
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 async def get_all_users(role_filter: UserRoleFilter):
     """
@@ -51,7 +51,7 @@ def calculate_growth_pct(current: int, previous: int) -> float:
     return round(((current - previous) / previous) * 100, 2)
 
 async def get_dashboard_stats():
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     
     # Last month range
@@ -87,7 +87,7 @@ async def get_dashboard_stats():
     }
 
 async def get_user_growth(filter_type: GrowthFilter):
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     data_points = []
 
     if filter_type == GrowthFilter.WEEKLY:
