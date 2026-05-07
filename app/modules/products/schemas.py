@@ -56,6 +56,8 @@ class ProductResponse(BaseModel):
     sellerId: int
     category: CategoryResponse
     seller: SellerInfo
+    pending_orders_count: Optional[int] = 0
+    delivered_orders_count: Optional[int] = 0
 
     class Config:
         from_attributes = True

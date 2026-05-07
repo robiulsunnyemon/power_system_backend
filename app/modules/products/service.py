@@ -3,7 +3,7 @@ from fastapi import UploadFile, HTTPException
 from typing import List, Optional
 from app.modules.products.schemas import ProductCreate
 from app.common.cloudinary import upload_image
-from prisma.enums import ProductStatus
+from prisma.enums import ProductStatus, OrderStatus
 
 async def upload_product_images(files: List[UploadFile]):
     """
@@ -33,6 +33,15 @@ def format_product_response(product):
             "displayname": product.seller.displayname,
             "profile_image": product.seller.profile.profile_image if product.seller.profile else None
         }
+    
+    # Add pending and delivered orders count if orders are included in the query
+    if hasattr(product, "orders") and product.orders is not None:
+        p_dict["pending_orders_count"] = sum(1 for o in product.orders if o.status == OrderStatus.PENDING)
+        p_dict["delivered_orders_count"] = sum(1 for o in product.orders if o.status == OrderStatus.DELIVERED)
+    else:
+        p_dict["pending_orders_count"] = 0
+        p_dict["delivered_orders_count"] = 0
+        
     return p_dict
 
 async def create_product(seller_id: int, data: ProductCreate):
@@ -84,7 +93,11 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
     """
     all_products = await db.product.find_many(
         where={"sellerId": seller_id},
-        include={"category": True, "seller": {"include": {"profile": True}}},
+        include={
+            "category": True, 
+            "seller": {"include": {"profile": True}},
+            "orders": {"where": {"status": {"in": [OrderStatus.PENDING, OrderStatus.DELIVERED]}}}
+        },
         order={"createdAt": "desc"}
     )
     
