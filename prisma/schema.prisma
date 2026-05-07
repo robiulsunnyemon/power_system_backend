@@ -282,6 +282,22 @@ enum ApplicationStatus {
   COMPLETED
 }
 
+enum SettingType {
+  TERMS_CONDITION
+  ABOUT_US
+  PRIVACY_POLICY
+}
+
+model Setting {
+  id        Int         @id @default(autoincrement())
+  title     SettingType @unique
+  content   String      @db.Text
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@map("settings")
+}
+
 enum ReportReason {
   FRAUD_ATTEMPT
   HARASSMENT
