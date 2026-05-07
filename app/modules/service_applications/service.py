@@ -3,6 +3,7 @@ from fastapi import HTTPException
 from typing import List
 from app.modules.service_applications.schemas import ServiceApplicationCreate, ServiceApplicationStatusUpdate
 from prisma.enums import ApplicationStatus, ServiceStatus
+from datetime import datetime, timedelta, timezone
 
 def format_application_response(app):
     """
@@ -161,3 +162,122 @@ async def update_application_status(provider_id: int, application_id: int, data:
     )
 
     return format_application_response(updated_app)
+
+async def get_provider_earnings(provider_id: int):
+    """
+    Returns earnings statistics and history for a service provider.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Fetch all applications for the provider's services
+    applications = await db.serviceapplication.find_many(
+        where={
+            "service": {"providerId": provider_id}
+        },
+        include={"service": True},
+        order={"updatedAt": "desc"}
+    )
+
+    total_completed_jobs = sum(1 for a in applications if str(a.status).endswith("COMPLETED"))
+    total_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("COMPLETED"))
+    
+    # Pending earnings are from ACCEPTED but not yet COMPLETED applications
+    pending_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("ACCEPTED"))
+
+    # Time-based quick stats (based on updatedAt for completed status)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    earnings_this_week = sum(
+        a.proposedRate for a in applications 
+        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_week
+    )
+    earnings_this_month = sum(
+        a.proposedRate for a in applications 
+        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_month
+    )
+
+    # History (Recent 15 items)
+    history = []
+    for a in applications[:15]:
+        history.append({
+            "id": a.id,
+            "title": a.service.title,
+            "amount": a.proposedRate,
+            "status": a.status,
+            "date": a.updatedAt,
+            "images": a.service.images
+        })
+
+    return {
+        "total_earnings": total_earnings,
+        "pending_earnings": pending_earnings,
+        "quick_stats": {
+            "this_week": earnings_this_week,
+            "this_month": earnings_this_month,
+            "total_completed_jobs": total_completed_jobs
+        },
+        "history": history
+    }
+
+
+async def get_user_earnings(user_id: int):
+    """
+    Returns earnings statistics and history for a service provider.
+    """
+    now = datetime.now(timezone.utc)
+
+    # Fetch all applications where the user was the applicant (worker/client)
+    applications = await db.serviceapplication.find_many(
+        where={
+            "clientId": user_id
+        },
+        include={"service": True},
+        order={"updatedAt": "desc"}
+    )
+
+    total_completed_jobs = sum(1 for a in applications if str(a.status).endswith("COMPLETED"))
+    total_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("COMPLETED"))
+
+    # Pending earnings are from ACCEPTED but not yet COMPLETED applications
+    pending_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("ACCEPTED"))
+
+    # Time-based quick stats (based on updatedAt for completed status)
+    start_of_week = now - timedelta(days=now.weekday())
+    start_of_week = start_of_week.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    earnings_this_week = sum(
+        a.proposedRate for a in applications
+        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_week
+    )
+    earnings_this_month = sum(
+        a.proposedRate for a in applications
+        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_month
+    )
+
+    # History (Recent 15 items)
+    history = []
+    for a in applications[:15]:
+        history.append({
+            "id": a.id,
+            "title": a.service.title,
+            "amount": a.proposedRate,
+            "status": a.status,
+            "date": a.updatedAt,
+            "images": a.service.images
+        })
+
+    return {
+        "total_earnings": total_earnings,
+        "pending_earnings": pending_earnings,
+        "quick_stats": {
+            "this_week": earnings_this_week,
+            "this_month": earnings_this_month,
+            "total_completed_jobs": total_completed_jobs
+        },
+        "history": history
+    }

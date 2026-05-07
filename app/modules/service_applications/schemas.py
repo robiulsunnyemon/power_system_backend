@@ -52,3 +52,22 @@ class ServiceApplicationResponse(BaseModel):
 
 class ServiceApplicationStatusUpdate(BaseModel):
     status: ApplicationStatus
+
+class EarningsQuickStats(BaseModel):
+    this_week: float
+    this_month: float
+    total_completed_jobs: int
+
+class EarningsHistoryItem(BaseModel):
+    id: int
+    title: str
+    amount: float
+    status: ApplicationStatus
+    date: datetime
+    images: List[str] = []
+
+class ProviderEarningsResponse(BaseModel):
+    total_earnings: float
+    pending_earnings: float
+    quick_stats: EarningsQuickStats
+    history: List[EarningsHistoryItem]
