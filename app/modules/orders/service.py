@@ -1,6 +1,6 @@
 from app.core.db import db
 from fastapi import HTTPException
-from typing import List
+from typing import List,Optional
 from app.modules.orders import schemas
 from app.modules.products.service import format_product_response
 from prisma.enums import OrderStatus, ProductStatus
@@ -58,13 +58,16 @@ async def place_order(user_id: int, data: schemas.OrderCreate):
     
     return format_order_response(order)
 
-async def get_buyer_orders(user_id: int, status_filter: str = "ALL"):
+async def get_buyer_orders(user_id: int, status_filter: str = "ALL", order_id: Optional[int] = None):
     """
-    Returns all orders placed by a specific buyer with tracking, optionally filtered by status.
+    Returns all orders placed by a specific buyer with tracking, optionally filtered by status and order ID.
     """
     where = {"userId": user_id}
     if status_filter != "ALL":
         where["status"] = status_filter
+    
+    if order_id:
+        where["id"] = order_id
 
     orders = await db.order.find_many(
         where=where,

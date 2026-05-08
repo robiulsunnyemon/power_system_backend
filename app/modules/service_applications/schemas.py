@@ -1,8 +1,16 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any
 from datetime import datetime
+from enum import Enum
 from prisma.enums import ApplicationStatus
 from app.modules.products.schemas import SellerInfo
+
+class ApplicationStatusFilter(str, Enum):
+    ALL = "ALL"
+    PENDING = "PENDING"
+    ACCEPTED = "ACCEPTED"
+    DECLINED = "DECLINED"
+    COMPLETED = "COMPLETED"
 
 class ProviderInfo(BaseModel):
     id: int

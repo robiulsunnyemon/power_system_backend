@@ -1,6 +1,6 @@
 from app.core.db import db
 from fastapi import HTTPException
-from typing import List
+from typing import List,Optional
 from app.modules.service_applications.schemas import ServiceApplicationCreate, ServiceApplicationStatusUpdate
 from prisma.enums import ApplicationStatus, ServiceStatus
 from datetime import datetime, timedelta, timezone
@@ -94,12 +94,19 @@ async def get_service_applications(provider_id: int, service_id: int = None, sta
     )
     return [format_application_response(a) for a in applications]
 
-async def get_client_applications(client_id: int):
+async def get_client_applications(client_id: int, application_id: Optional[int] = None, status: str = "ALL"):
     """
-    Returns applications sent by a client.
+    Returns applications sent by a client, optionally filtered by application ID and status.
     """
+    where = {"clientId": client_id}
+    if application_id:
+        where["id"] = application_id
+    
+    if status != "ALL":
+        where["status"] = status
+
     applications = await db.serviceapplication.find_many(
-        where={"clientId": client_id},
+        where=where,
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True},
         order={"createdAt": "desc"}
     )

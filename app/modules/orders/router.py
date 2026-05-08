@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, Query,status
+from typing import List, Optional
 from app.modules.orders import service, schemas
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -18,7 +18,7 @@ async def check_seller_role(user_id: int = Depends(get_current_user_id)):
 
 # --- BUYERS ENDPOINTS ---
 
-@router.post("/", response_model=schemas.OrderResponse, tags=["Orders - Buyer"])
+@router.post("/", response_model=schemas.OrderResponse, tags=["Orders - Buyer"],status_code=status.HTTP_201_CREATED)
 async def create_order(
     data: schemas.OrderCreate,
     user_id: int = Depends(get_current_user_id)
@@ -30,13 +30,14 @@ async def create_order(
 
 @router.get("/my", response_model=List[schemas.OrderResponse], tags=["Orders - Buyer"])
 async def list_my_orders(
+    order_id: Optional[int] = Query(None, description="Optional: Filter by a specific order ID"),
     status: schemas.OrderStatusFilter = Query(schemas.OrderStatusFilter.ALL),
     user_id: int = Depends(get_current_user_id)
 ):
     """
     Endpoint for buyers to see their own orders.
     """
-    return await service.get_buyer_orders(user_id, status)
+    return await service.get_buyer_orders(user_id, status, order_id)
 
 
 # --- SELLERS ENDPOINTS ---

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
 from typing import List, Optional
 from app.modules.service_applications.schemas import (
     ServiceApplicationCreate, ServiceApplicationResponse, ServiceApplicationStatusUpdate,
-    ProviderEarningsResponse
+    ProviderEarningsResponse, ApplicationStatusFilter
 )
 from app.modules.service_applications.service import (
     apply_for_service, get_service_applications, get_client_applications, update_application_status,
@@ -50,9 +50,11 @@ async def apply_service_endpoint(
 
 @router.get("/my-applications", response_model=List[ServiceApplicationResponse])
 async def get_my_applications_endpoint(
+    application_id: Optional[int] = Query(None, description="Optional: Filter by a specific application ID"),
+    status: ApplicationStatusFilter = Query(ApplicationStatusFilter.ALL, description="Optional: Filter by application status"),
     client_id: int = Depends(get_current_user_id)
 ):
-    return await get_client_applications(client_id)
+    return await get_client_applications(client_id, application_id, status)
 
 @router.get("/provider/requests", response_model=List[ServiceApplicationResponse])
 async def get_provider_requests_endpoint(
