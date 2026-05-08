@@ -49,6 +49,7 @@ COPY --from=builder /app/package /app/package
 # Copy the application source code
 COPY app/ ./app/
 COPY prisma/ ./prisma/
+COPY scripts/ ./scripts/
 
 # Generate Prisma client (using the installed package)
 RUN python -m prisma generate
