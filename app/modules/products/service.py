@@ -22,16 +22,38 @@ async def upload_product_images(files: List[UploadFile]):
 
 def format_product_response(product):
     """
-    Helper to format product data, flattening profile images.
+    Helper to format product data, flattening profile images and adding seller stats.
     """
     p_dict = product.model_dump()
     if product.seller:
+        # 1. Calculate Seller Stats
+        raw_score = product.seller.profile.raw_score if product.seller.profile else 0
+        
+        # Badge Logic
+        if raw_score >= 800:
+            badge = "Elite"
+        elif raw_score >= 500:
+            badge = "Verified"
+        elif raw_score >= 300:
+            badge = "Trusted"
+        else:
+            badge = "New Member"
+            
+        # Rating Stats
+        reviews = getattr(product.seller, "reviews_received", [])
+        ratings = [r.rating for r in reviews] if reviews else []
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0.0
+        total_reviews = len(reviews) if reviews else 0
+
         p_dict["seller"] = {
             "id": product.seller.id,
             "fullname": product.seller.fullname,
             "email": product.seller.email,
             "displayname": product.seller.displayname,
-            "profile_image": product.seller.profile.profile_image if product.seller.profile else None
+            "profile_image": product.seller.profile.profile_image if product.seller.profile else None,
+            "badge": badge,
+            "avg_rating": round(avg_rating, 1),
+            "total_reviews": total_reviews
         }
     
     # Add pending and delivered orders count if orders are included in the query
@@ -82,7 +104,7 @@ async def create_product(seller_id: int, data: ProductCreate):
             "categoryId": category.id,
             "status": ProductStatus.ACTIVE
         },
-        include={"category": True, "seller": {"include": {"profile": True}}}
+        include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}}
     )
     
     return format_product_response(product)
@@ -95,7 +117,7 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
         where={"sellerId": seller_id},
         include={
             "category": True, 
-            "seller": {"include": {"profile": True}},
+            "seller": {"include": {"profile": True, "reviews_received": True}},
             "orders": {"where": {"status": {"in": [OrderStatus.PENDING, OrderStatus.DELIVERED]}}}
         },
         order={"createdAt": "desc"}
@@ -135,7 +157,7 @@ async def get_all_products(category_filter: str = "ALL"):
         
     products = await db.product.find_many(
         where=query,
-        include={"category": True, "seller": {"include": {"profile": True}}},
+        include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
         order={"createdAt": "desc"}
     )
     

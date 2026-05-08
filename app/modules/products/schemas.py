@@ -22,6 +22,9 @@ class SellerInfo(BaseModel):
     email: str
     displayname: Optional[str] = None
     profile_image: Optional[str] = None
+    badge: Optional[str] = "New Member"
+    avg_rating: float = 0.0
+    total_reviews: int = 0
 
 class ProductCreate(BaseModel):
     title: str
