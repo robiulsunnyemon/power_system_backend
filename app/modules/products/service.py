@@ -109,7 +109,7 @@ async def create_product(seller_id: int, data: ProductCreate):
     
     return format_product_response(product)
 
-async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
+async def get_seller_products(seller_id: int, status_filter: str = "ALL", product_id: Optional[int] = None):
     """
     Returns all products belonging to a specific seller with status counts and optional filtering.
     """
@@ -131,10 +131,13 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
     total_soldout = sum(1 for p in all_products if p.status == ProductStatus.SOLDOUT)
     
     # Apply filter to the list
+    filtered_products = all_products
+    
+    if product_id:
+        filtered_products = [p for p in filtered_products if p.id == product_id]
+        
     if status_filter != "ALL":
-        filtered_products = [p for p in all_products if p.status == status_filter]
-    else:
-        filtered_products = all_products
+        filtered_products = [p for p in filtered_products if p.status == status_filter]
     
     return {
         "total_products": len(all_products),
@@ -146,7 +149,7 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL"):
         "products": [format_product_response(p) for p in filtered_products]
     }
 
-async def get_all_products(category_filter: str = "ALL"):
+async def get_all_products(category_filter: str = "ALL", product_id: Optional[int] = None):
     """
     Returns all ACTIVE products, optionally filtered by category.
     """
@@ -154,6 +157,9 @@ async def get_all_products(category_filter: str = "ALL"):
     
     if category_filter != "ALL":
         query["category"] = {"name": category_filter.upper().strip()}
+        
+    if product_id:
+        query["id"] = product_id
         
     products = await db.product.find_many(
         where=query,

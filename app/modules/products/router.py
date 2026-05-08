@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form,Query
 from typing import List, Optional, Annotated
 from app.modules.products import service, schemas
 from app.modules.users.router import get_current_user_id
@@ -41,20 +41,24 @@ async def create_product(
 
 @router.get("/products/my", response_model=schemas.SellerProductsResponse)
 async def get_my_products(
+    product_id: Optional[int] = Query(None, description="Optional: Filter by a specific product ID"),
     status: schemas.ProductStatusFilter = schemas.ProductStatusFilter.ALL,
     seller_id: int = Depends(check_seller_role)
 ):
     """
     Endpoint for sellers to see their own products with status counts and filtering.
     """
-    return await service.get_seller_products(seller_id, status)
+    return await service.get_seller_products(seller_id, status, product_id)
 
 @router.get("/products", response_model=List[schemas.ProductResponse])
-async def list_products(category: str = "ALL"):
+async def list_products(
+    product_id: Optional[int] = Query(None, description="Optional: Filter by a specific product ID"),
+    category: str = "ALL"
+):
     """
     Public endpoint to list all active products with category filtering.
     """
-    return await service.get_all_products(category)
+    return await service.get_all_products(category, product_id)
 
 @router.get("/categories", response_model=List[schemas.CategoryResponse])
 async def list_categories():
