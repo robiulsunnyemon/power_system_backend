@@ -13,6 +13,8 @@ from app.modules.service_applications.router import router as service_applicatio
 from app.modules.reports.router import router as reports_router
 from app.modules.settings.router import router as settings_router
 from app.modules.bugs.router import router as bugs_router
+from fastapi.middleware.cors import CORSMiddleware
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,6 +27,14 @@ app = FastAPI(
     description="FastAPI, Prisma, PostgreSQL Backend",
     version="1.0.0",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth_router)
