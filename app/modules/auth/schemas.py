@@ -6,6 +6,7 @@ class Role(str, Enum):
     USER = "USER"
     SELLER = "SELLER"
     SERVICE_PROVIDER = "SERVICE_PROVIDER"
+    ADMIN = "ADMIN"
 
 class SignupRequest(BaseModel):
     fullname: str
