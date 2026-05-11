@@ -23,6 +23,7 @@ model User {
   longitude     Float?
   latitude      Float?
   tokenVersion  Int           @default(1)
+  lastActiveRole Role?         @default(USER)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   profile       UserProfile?

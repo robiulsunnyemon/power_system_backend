@@ -48,7 +48,7 @@ async def seed_users():
         for i in range(5):
             days_ago = random.randint(0, 6)
             created_at = now - timedelta(days=days_ago, hours=random.randint(0, 23))
-            if await create_test_user(f"week_user{i}@test.com", f"Week User {i}", AccountStatus.ACTIVE, created_at):
+            if await create_test_user(f"user{i}@test.com", f"Week User {i}", AccountStatus.ACTIVE, created_at):
                 created_count += 1
 
         # 2. Last 30 days (10 users)
@@ -56,7 +56,7 @@ async def seed_users():
             days_ago = random.randint(7, 29)
             created_at = now - timedelta(days=days_ago)
             status = AccountStatus.ACTIVE if i % 2 == 0 else AccountStatus.PENDING
-            if await create_test_user(f"month_user{i}@test.com", f"Month User {i}", status, created_at):
+            if await create_test_user(f"user{i}@test.com", f"Month User {i}", status, created_at):
                 created_count += 1
 
         print("Seeding users for 6-Month/Yearly tests...")
@@ -64,7 +64,7 @@ async def seed_users():
         for i in range(15):
             days_ago = random.randint(30, 180)
             created_at = now - timedelta(days=days_ago)
-            if await create_test_user(f"six_month_user{i}@test.com", f"6-Month User {i}", AccountStatus.ACTIVE, created_at):
+            if await create_test_user(f"user{i}@test.com", f"6-Month User {i}", AccountStatus.ACTIVE, created_at):
                 created_count += 1
 
         # 4. Last 12 months (20 users)
@@ -72,7 +72,7 @@ async def seed_users():
             days_ago = random.randint(180, 365)
             created_at = now - timedelta(days=days_ago)
             status = AccountStatus.ACTIVE if i % 3 != 0 else AccountStatus.PENDING
-            if await create_test_user(f"year_user{i}@test.com", f"Year User {i}", status, created_at):
+            if await create_test_user(f"user{i}@test.com", f"Year User {i}", status, created_at):
                 created_count += 1
 
         print("Seeding users for Year Range test...")
@@ -80,7 +80,7 @@ async def seed_users():
         for i in range(15):
             days_ago = random.randint(366, 365 * 3)
             created_at = now - timedelta(days=days_ago)
-            if await create_test_user(f"old_user{i}@test.com", f"Old User {i}", AccountStatus.ACTIVE, created_at):
+            if await create_test_user(f"user{i}@test.com", f"Old User {i}", AccountStatus.ACTIVE, created_at):
                 created_count += 1
 
         print(f"\n[!] Finished! Total new users created: {created_count}")

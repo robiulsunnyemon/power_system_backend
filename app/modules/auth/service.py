@@ -82,8 +82,31 @@ async def login_user(data: LoginRequest):
     if user.accountStatus != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail=f"Account is {user.accountStatus}")
     
-    token = create_access_token(data={"sub": str(user.id), "email": user.email, "roles": user.roles, "token_version": user.tokenVersion})
-    return {"access_token": token, "token_type": "bearer"}
+    last_active_role = user.lastActiveRole
+    
+    if data.role:
+        if data.role.value not in user.roles:
+            raise HTTPException(status_code=400, detail=f"User does not have the role: {data.role.value}")
+        
+        last_active_role = data.role.value
+        await db.user.update(
+            where={"id": user.id},
+            data={"lastActiveRole": last_active_role}
+        )
+    
+    token = create_access_token(data={
+        "sub": str(user.id), 
+        "email": user.email, 
+        "roles": user.roles, 
+        "token_version": user.tokenVersion,
+        "last_active_role": last_active_role
+    })
+    
+    return {
+        "access_token": token, 
+        "token_type": "bearer",
+        "last_active_role": last_active_role
+    }
 
 async def forget_password(email: str, background_tasks: BackgroundTasks):
     user = await db.user.find_unique(where={"email": email})

@@ -196,19 +196,21 @@ async def become_seller(user_id: int):
         where={"id": user_id},
         data={
             "roles": {"set": updated_roles},
-            "tokenVersion": new_token_version
+            "tokenVersion": new_token_version,
+            "lastActiveRole": "SELLER"
         }
     )
     
     from app.common.security import create_access_token
     new_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version, "last_active_role": "SELLER"}
     )
     
     return {
         "message": message,
         "access_token": new_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "last_active_role": "SELLER"
     }
 
 async def become_service_provider(user_id: int):
@@ -230,19 +232,21 @@ async def become_service_provider(user_id: int):
         where={"id": user_id},
         data={
             "roles": {"set": updated_roles},
-            "tokenVersion": new_token_version
+            "tokenVersion": new_token_version,
+            "lastActiveRole": "SERVICE_PROVIDER"
         }
     )
     
     from app.common.security import create_access_token
     new_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version, "last_active_role": "SERVICE_PROVIDER"}
     )
     
     return {
         "message": message,
         "access_token": new_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "last_active_role": "SERVICE_PROVIDER"
     }
 
 async def become_user(user_id: int):
@@ -267,17 +271,19 @@ async def become_user(user_id: int):
         where={"id": user_id},
         data={
             "roles": {"set": updated_roles},
-            "tokenVersion": new_token_version
+            "tokenVersion": new_token_version,
+            "lastActiveRole": "USER"
         }
     )
     
     from app.common.security import create_access_token
     new_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version}
+        data={"sub": str(user.id), "email": user.email, "roles": updated_roles, "token_version": new_token_version, "last_active_role": "USER"}
     )
     
     return {
         "message": message,
         "access_token": new_token,
-        "token_type": "bearer"
+        "token_type": "bearer",
+        "last_active_role": "USER"
     }

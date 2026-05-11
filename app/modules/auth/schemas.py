@@ -23,6 +23,7 @@ class VerifyOTPRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    role: Optional[Role] = None
 
 class ForgetPasswordRequest(BaseModel):
     email: EmailStr
