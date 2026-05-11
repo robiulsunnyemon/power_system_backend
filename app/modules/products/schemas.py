@@ -73,3 +73,9 @@ class SellerProductsResponse(BaseModel):
     total_deleted: int
     total_soldout: int
     products: List[ProductResponse]
+
+class PaginatedProductResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    products: List[ProductResponse]

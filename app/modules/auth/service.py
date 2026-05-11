@@ -102,13 +102,6 @@ async def login_user(data: LoginRequest):
         "last_active_role": last_active_role
     })
 
-    if user.email=="admin@powersystem.com":
-        return {
-            "access_token": token,
-            "token_type": "bearer",
-            "last_active_role": "ADMIN"
-        }
-    
     return {
         "access_token": token, 
         "token_type": "bearer",

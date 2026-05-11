@@ -149,9 +149,14 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL", produc
         "products": [format_product_response(p) for p in filtered_products]
     }
 
-async def get_all_products(category_filter: str = "ALL", product_id: Optional[int] = None):
+async def get_all_products(
+    category_filter: str = "ALL", 
+    product_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 10
+):
     """
-    Returns all ACTIVE products, optionally filtered by category.
+    Returns all ACTIVE products, optionally filtered by category, with pagination.
     """
     query = {"status": ProductStatus.ACTIVE}
     
@@ -161,13 +166,26 @@ async def get_all_products(category_filter: str = "ALL", product_id: Optional[in
     if product_id:
         query["id"] = product_id
         
+    # Get total count for pagination
+    total_count = await db.product.count(where=query)
+    
+    # Calculate skip
+    skip = (page - 1) * page_size
+    
     products = await db.product.find_many(
         where=query,
         include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
-        order={"createdAt": "desc"}
+        order={"createdAt": "desc"},
+        skip=skip,
+        take=page_size
     )
     
-    return [format_product_response(p) for p in products]
+    return {
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "products": [format_product_response(p) for p in products]
+    }
 
 async def get_all_categories():
     """

@@ -1,7 +1,7 @@
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
 from typing import List
-from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse
+from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse
 from app.modules.services.service import (
     create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id
 )
@@ -37,11 +37,13 @@ async def get_my_services_endpoint(
 ):
     return await get_provider_services(provider_id, status)
 
-@router.get("/", response_model=List[ServiceResponse],status_code=status.HTTP_200_OK)
+@router.get("/", response_model=PaginatedServiceResponse, status_code=status.HTTP_200_OK)
 async def get_all_services_endpoint(
-    category: str = Query("ALL", description="Filter by category name")
+    category: str = Query("ALL", description="Filter by category name"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100)
 ):
-    return await get_all_services(category)
+    return await get_all_services(category, page, page_size)
 
 @router.get("/{service_id}", response_model=ServiceResponse, status_code=status.HTTP_200_OK)
 async def get_service_by_id_endpoint(

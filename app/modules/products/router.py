@@ -50,15 +50,17 @@ async def get_my_products(
     """
     return await service.get_seller_products(seller_id, status, product_id)
 
-@router.get("/products", response_model=List[schemas.ProductResponse])
+@router.get("/products", response_model=schemas.PaginatedProductResponse)
 async def list_products(
     product_id: Optional[int] = Query(None, description="Optional: Filter by a specific product ID"),
-    category: str = "ALL"
+    category: str = "ALL",
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100)
 ):
     """
-    Public endpoint to list all active products with category filtering.
+    Public endpoint to list all active products with category filtering and pagination.
     """
-    return await service.get_all_products(category, product_id)
+    return await service.get_all_products(category, product_id, page, page_size)
 
 @router.get("/categories", response_model=List[schemas.CategoryResponse])
 async def list_categories():

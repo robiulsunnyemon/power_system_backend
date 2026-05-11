@@ -79,22 +79,39 @@ async def get_provider_services(provider_id: int, status_filter: str = "ALL"):
         "services": [format_service_response(s) for s in filtered_services]
     }
 
-async def get_all_services(category_filter: str = "ALL"):
+async def get_all_services(
+    category_filter: str = "ALL",
+    page: int = 1,
+    page_size: int = 10
+):
     """
-    Returns all PUBLISHED services, optionally filtered by category.
+    Returns all PUBLISHED services, optionally filtered by category, with pagination.
     """
     query = {"status": ServiceStatus.PUBLISHED}
     
     if category_filter != "ALL":
         query["category"] = category_filter.strip()
         
+    # Get total count for pagination
+    total_count = await db.service.count(where=query)
+    
+    # Calculate skip
+    skip = (page - 1) * page_size
+    
     services = await db.service.find_many(
         where=query,
         include={"provider": {"include": {"profile": True}}},
-        order={"createdAt": "desc"}
+        order={"createdAt": "desc"},
+        skip=skip,
+        take=page_size
     )
     
-    return [format_service_response(s) for s in services]
+    return {
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "services": [format_service_response(s) for s in services]
+    }
 
 async def get_service_by_id(service_id: int):
     """

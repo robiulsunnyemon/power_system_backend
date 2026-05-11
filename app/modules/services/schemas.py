@@ -60,3 +60,9 @@ class ServiceListResponse(BaseModel):
     total_active: int
     total_draft: int
     services: List[ServiceResponse]
+
+class PaginatedServiceResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    services: List[ServiceResponse]
