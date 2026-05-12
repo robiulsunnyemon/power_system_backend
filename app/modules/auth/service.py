@@ -26,7 +26,15 @@ async def signup_user(data: SignupRequest, background_tasks: BackgroundTasks):
             "roles": [r.value for r in data.roles],
             "otp": otp,
             "isVerified": False,
-            "accountStatus": AccountStatus.PENDING
+            "accountStatus": AccountStatus.PENDING,
+            "notificationSettings": {
+                "create": {
+                    "orderUpdates": True,
+                    "serviceUpdates": True,
+                    "newServiceAlerts": True,
+                    "messageNotifications": True
+                }
+            }
         }
     )
     

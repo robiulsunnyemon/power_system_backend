@@ -52,6 +52,26 @@ async def create_service(provider_id: int, data: ServiceCreate):
         include={"provider": {"include": {"profile": True}}}
     )
     
+    # Notify Past Clients (who had COMPLETED applications with this provider)
+    from prisma.enums import ApplicationStatus
+    past_clients = await db.serviceapplication.find_many(
+        where={
+            "service": {"providerId": provider_id},
+            "status": ApplicationStatus.COMPLETED
+        },
+        distinct=["clientId"]
+    )
+    
+    from app.modules.notifications.service import send_notification
+    for client in past_clients:
+        await send_notification(
+            user_id=client.clientId,
+            title="New Service from your Provider",
+            description=f"Your previous service provider has created a new service: '{service.title}'",
+            notification_type="new_service",
+            image=service.images[0] if service.images else None
+        )
+    
     return format_service_response(service)
 
 async def get_provider_services(provider_id: int, status_filter: str = "ALL"):

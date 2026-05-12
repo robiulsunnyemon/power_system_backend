@@ -4,6 +4,7 @@ from typing import List,Optional
 from app.modules.orders import schemas
 from app.modules.products.service import format_product_response
 from prisma.enums import OrderStatus, ProductStatus
+from app.modules.notifications.service import send_notification
 from app.common.utils import calculate_trust_score
 from datetime import datetime, timedelta, timezone
 
@@ -54,6 +55,16 @@ async def place_order(user_id: int, data: schemas.OrderCreate):
             "product": {"include": {"category": True, "seller": {"include": {"profile": True}}}},
             "tracking": True
         }
+    )
+    
+    # Notify Seller
+    seller_id = order.product.sellerId
+    await send_notification(
+        user_id=seller_id,
+        title="New Order Received",
+        description=f"You have received a new order for '{order.product.title}'.",
+        notification_type="order",
+        image=order.product.images[0] if order.product.images else None
     )
     
     return format_order_response(order)
@@ -204,6 +215,22 @@ async def update_order_status(seller_id: int, order_id: int, data: schemas.Order
                     "trust_score": new_trust
                 }
             }
+        )
+    
+    # Notify Buyer
+    status_msg_map = {
+        OrderStatus.ACCEPTED: "Your order has been accepted.",
+        OrderStatus.DELIVERED: "Your order has been delivered successfully.",
+        OrderStatus.CANCELLED: "Your order has been cancelled."
+    }
+    
+    if data.status in status_msg_map:
+        await send_notification(
+            user_id=updated_order.userId,
+            title=f"Order Update: {data.status}",
+            description=status_msg_map[data.status],
+            notification_type="order",
+            image=updated_order.product.images[0] if updated_order.product.images else None
         )
     
     return format_order_response(updated_order)

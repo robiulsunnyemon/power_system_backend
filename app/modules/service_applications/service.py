@@ -4,6 +4,7 @@ from typing import List,Optional
 from app.modules.service_applications.schemas import ServiceApplicationCreate, ServiceApplicationStatusUpdate
 from prisma.enums import ApplicationStatus, ServiceStatus
 from datetime import datetime, timedelta, timezone
+from app.modules.notifications.service import send_notification
 
 def format_application_response(app):
     """
@@ -74,6 +75,17 @@ async def apply_for_service(client_id: int, service_id: int, data: ServiceApplic
         },
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True}
     )
+
+    # Notify Provider
+    provider_id = application.service.providerId
+    await send_notification(
+        user_id=provider_id,
+        title="New Service Application",
+        description=f"You have a new application for '{application.service.title}'.",
+        notification_type="service",
+        image=application.service.images[0] if application.service.images else None
+    )
+
     return format_application_response(application)
 
 async def get_service_applications(provider_id: int, service_id: int = None, status: ApplicationStatus = ApplicationStatus.PENDING):
@@ -167,6 +179,22 @@ async def update_application_status(provider_id: int, application_id: int, data:
         },
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True}
     )
+
+    # Notify Client
+    status_msg_map = {
+        ApplicationStatus.ACCEPTED: "Your service application has been accepted.",
+        ApplicationStatus.COMPLETED: "Your service has been marked as completed.",
+        ApplicationStatus.DECLINED: "Your service application has been declined."
+    }
+    
+    if data.status in status_msg_map:
+        await send_notification(
+            user_id=updated_app.clientId,
+            title=f"Application Update: {data.status}",
+            description=status_msg_map[data.status],
+            notification_type="service",
+            image=updated_app.service.images[0] if updated_app.service.images else None
+        )
 
     return format_application_response(updated_app)
 

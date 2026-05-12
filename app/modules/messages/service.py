@@ -16,8 +16,23 @@ async def save_message(sender_id: int, data: MessageCreate):
             "senderId": sender_id,
             "receiverId": data.receiverId,
             "replyToId": data.replyToId
-        }
+        },
+        include={"sender": True}
     )
+    
+    # Notify Receiver (Push Only)
+    from app.modules.notifications.service import send_notification
+    sender_name = message.sender.fullname
+    content_preview = message.content[:50] + "..." if len(message.content) > 50 else message.content
+    
+    await send_notification(
+        user_id=data.receiverId,
+        title=f"New message from {sender_name}",
+        description=content_preview if message.type == "TEXT" else "Sent a file",
+        notification_type="message",
+        push_only=True
+    )
+    
     return message
 
 async def get_conversations(user_id: int):

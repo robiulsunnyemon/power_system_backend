@@ -24,9 +24,14 @@ model User {
   latitude      Float?
   tokenVersion  Int           @default(1)
   lastActiveRole Role?         @default(USER)
+  fcmToken      String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  
   profile       UserProfile?
+  notificationSettings NotificationSetting?
+  notifications        Notification[]
+  
   products      Product[]
   orders        Order[]
 
@@ -45,6 +50,31 @@ model User {
   bugReports        BugReport[]
 
   @@map("users")
+}
+
+model Notification {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  image       String?
+  isRead      Boolean  @default(false)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model NotificationSetting {
+  id                 Int     @id @default(autoincrement())
+  userId             Int     @unique
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderUpdates       Boolean @default(true)
+  serviceUpdates     Boolean @default(true)
+  newServiceAlerts   Boolean @default(true)
+  messageNotifications Boolean @default(true)
+
+  @@map("notification_settings")
 }
 
 model UserProfile {

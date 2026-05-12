@@ -18,7 +18,8 @@ dependencies = [
     "python-dotenv (>=1.2.2,<2.0.0)",
     "fastapi-mail (>=1.6.2,<2.0.0)",
     "pydantic-settings (>=2.14.0,<3.0.0)",
-    "cloudinary (>=1.44.1,<2.0.0)"
+    "cloudinary (>=1.44.1,<2.0.0)",
+    "firebase-admin (>=7.4.0,<8.0.0)"
 ]
 
 
