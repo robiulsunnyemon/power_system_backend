@@ -66,3 +66,6 @@ class PaginatedServiceResponse(BaseModel):
     page: int
     page_size: int
     services: List[ServiceResponse]
+
+class ServiceCategoryListResponse(BaseModel):
+    categories: List[str]

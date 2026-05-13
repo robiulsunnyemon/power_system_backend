@@ -189,3 +189,20 @@ async def delete_service(provider_id: int, service_id: int):
         data={"status": ServiceStatus.CLOSED}
     )
     return {"message": "Service closed successfully"}
+
+async def get_published_service_categories():
+    """
+    Returns a unique list of categories for all PUBLISHED services.
+    """
+    # Using Prisma's group_by to get unique category names
+    grouped = await db.service.group_by(
+        by=["category"],
+        where={
+            "status": ServiceStatus.PUBLISHED,
+            "category": {"not": None}
+        }
+    )
+    
+    categories = [item["category"] for item in grouped if item["category"]]
+    
+    return {"categories": categories}

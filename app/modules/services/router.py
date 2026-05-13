@@ -1,9 +1,9 @@
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
 from typing import List
-from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse
+from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse, ServiceCategoryListResponse
 from app.modules.services.service import (
-    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id
+    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -44,6 +44,13 @@ async def get_all_services_endpoint(
     page_size: int = Query(10, ge=1, le=100)
 ):
     return await get_all_services(category, page, page_size)
+
+@router.get("/categories", response_model=ServiceCategoryListResponse, status_code=status.HTTP_200_OK)
+async def get_service_categories_endpoint():
+    """
+    Get all unique categories from published services.
+    """
+    return await get_published_service_categories()
 
 @router.get("/{service_id}", response_model=ServiceResponse, status_code=status.HTTP_200_OK)
 async def get_service_by_id_endpoint(
