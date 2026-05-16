@@ -3,7 +3,7 @@ from fastapi import HTTPException, status, BackgroundTasks
 from app.core.db import db
 from app.common.security import hash_password, verify_password, create_access_token
 from app.common.mailer import generate_otp, send_otp_email
-from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest
+from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest, ChangePasswordRequest
 from prisma.enums import AccountStatus
 
 async def signup_user(data: SignupRequest, background_tasks: BackgroundTasks):
@@ -164,3 +164,21 @@ async def reset_password(user_id: int, new_password: str):
         data={"password": hashed_pwd}
     )
     return {"message": "Password reset successful."}
+
+async def change_password(user_id: int, data: ChangePasswordRequest):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not verify_password(data.current_password, user.password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+        
+    if data.new_password != data.confirm_password:
+        raise HTTPException(status_code=422, detail="New password and confirm password do not match")
+        
+    hashed_pwd = hash_password(data.new_password)
+    await db.user.update(
+        where={"id": user_id},
+        data={"password": hashed_pwd}
+    )
+    return {"message": "Password changed successfully"}

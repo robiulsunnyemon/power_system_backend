@@ -8,7 +8,7 @@ class SettingCreate(BaseModel):
     content: str
 
 class SettingUpdate(BaseModel):
-    title: Optional[SettingType] = None
+    #title: Optional[SettingType] = None
     content: Optional[str] = None
 
 class SettingResponse(BaseModel):

@@ -1,9 +1,30 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
-from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest, ForgetPasswordRequest, ResetPasswordRequest
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest, ForgetPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
 from app.modules.auth import service
 from app.common.security import decode_token
+from app.core.db import db
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+security = HTTPBearer()
+
+async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    payload = decode_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    
+    user_id = int(payload.get("sub"))
+    token_version = payload.get("token_version")
+    
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        
+    if user.tokenVersion != token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been invalidated. Please login again.")
+        
+    return user_id
 
 @router.post("/signup")
 async def signup(data: SignupRequest, background_tasks: BackgroundTasks):
@@ -37,3 +58,7 @@ async def reset_password(data: ResetPasswordRequest):
     
     user_id = int(payload.get("sub"))
     return await service.reset_password(user_id, data.new_password)
+
+@router.post("/change-password")
+async def change_password(data: ChangePasswordRequest, user_id: int = Depends(get_current_user_id)):
+    return await service.change_password(user_id, data)

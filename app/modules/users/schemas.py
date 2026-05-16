@@ -33,6 +33,8 @@ class UserProfileResponse(BaseModel):
     longitude: Optional[float] = None
     latitude: Optional[float] = None
     profile_image: Optional[str] = None
+    trust_score: float = 0.0
+    raw_score: float = 0.0
     createdAt: datetime
     updatedAt: datetime
 

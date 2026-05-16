@@ -23,6 +23,8 @@ async def get_all_users(role_filter: UserRoleFilter):
     for user in users:
         user_dict = user.model_dump()
         user_dict["profile_image"] = user.profile.profile_image if user.profile else None
+        user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
+        user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
         result.append(user_dict)
     
     return result
@@ -43,6 +45,8 @@ async def update_user_status(user_id: int, status):
     
     user_dict = updated_user.model_dump()
     user_dict["profile_image"] = updated_user.profile.profile_image if updated_user.profile else None
+    user_dict["trust_score"] = updated_user.profile.trust_score if updated_user.profile else 0
+    user_dict["raw_score"] = updated_user.profile.raw_score if updated_user.profile else 0
     return user_dict
 
 def calculate_growth_pct(current: int, previous: int) -> float:

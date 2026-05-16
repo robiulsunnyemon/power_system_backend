@@ -117,6 +117,8 @@ async def get_user_profile(user_id: int):
     
     user_dict = user.model_dump()
     user_dict["profile_image"] = user.profile.profile_image if user.profile else None
+    user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
+    user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
     return user_dict
 
 async def update_user_profile(user_id: int, data: UpdateProfileRequest):
@@ -129,6 +131,8 @@ async def update_user_profile(user_id: int, data: UpdateProfileRequest):
     
     user_dict = user.model_dump()
     user_dict["profile_image"] = user.profile.profile_image if user.profile else None
+    user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
+    user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
     return user_dict
 
 async def update_profile_image(user_id: int, file: UploadFile):
