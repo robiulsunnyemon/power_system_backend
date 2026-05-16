@@ -313,3 +313,40 @@ async def delete_my_account(user_id: int, data: DeleteAccountRequest):
         }
     )
     return {"message": "Account deleted successfully. You have been logged out."}
+
+async def get_user_summary(user_id: int):
+    """
+    Returns a summary of user's activity: total listings, completed jobs, and trust score.
+    """
+    from prisma.enums import OrderStatus, ApplicationStatus
+    
+    # 1. Listings Count
+    listings_count = await db.product.count(where={"sellerId": user_id})
+    
+    # 2. Jobs Completed Count (Orders + Service Applications)
+    delivered_orders = await db.order.count(
+        where={
+            "product": {"sellerId": user_id},
+            "status": OrderStatus.DELIVERED
+        }
+    )
+    
+    completed_services = await db.serviceapplication.count(
+        where={
+            "service": {"providerId": user_id},
+            "status": ApplicationStatus.COMPLETED
+        }
+    )
+    
+    total_jobs = delivered_orders + completed_services
+    
+    # 3. Trust Score
+    profile = await db.userprofile.find_unique(where={"userId": user_id})
+    trust_score = profile.trust_score if profile else 0.0
+    
+    return {
+        "listings": listings_count,
+        "jobs_completed": total_jobs,
+        "trust_score": trust_score
+    }
+

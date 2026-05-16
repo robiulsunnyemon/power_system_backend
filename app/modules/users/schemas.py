@@ -49,3 +49,9 @@ class UpdateProfileRequest(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     password: str
+
+class UserSummaryResponse(BaseModel):
+    listings: int
+    jobs_completed: int
+    trust_score: float
+

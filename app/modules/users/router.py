@@ -32,6 +32,13 @@ async def get_profile(user_id: int = Depends(get_current_user_id)):
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
+@router.get("/seller/me", response_model=schemas.SellerPublicProfileResponse)
+async def get_my_seller_profile(user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint for a logged-in seller to see their own public profile data.
+    """
+    return await service.get_seller_public_profile(user_id)
+
 @router.get("/seller/{seller_id}", response_model=schemas.SellerPublicProfileResponse)
 async def get_seller_profile(seller_id: int):
     """
@@ -78,3 +85,11 @@ async def delete_account(data: schemas.DeleteAccountRequest, user_id: int = Depe
     Endpoint for a user to delete their own account.
     """
     return await service.delete_my_account(user_id, data)
+
+@router.get("/summary", response_model=schemas.UserSummaryResponse)
+async def get_user_summary(user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint to get a summary of user's activity (listings, jobs, trust score).
+    """
+    return await service.get_user_summary(user_id)
+
