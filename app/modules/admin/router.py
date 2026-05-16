@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.modules.admin import service, schemas
 from app.modules.users.schemas import UserProfileResponse
+from app.modules.messages.schemas import MessageResponse
 from app.common.security import decode_token
 from app.core.db import db
 from typing import List
@@ -66,3 +67,14 @@ async def get_growth(
     Admin dashboard: Get user growth data points for charts.
     """
     return await service.get_user_growth(filter)
+
+@router.get("/chat-history/{user1_id}/{user2_id}", response_model=List[MessageResponse])
+async def get_user_chat_history(
+    user1_id: int,
+    user2_id: int,
+    admin=Depends(get_current_admin)
+):
+    """
+    Endpoint for admin to get chat history between any two users.
+    """
+    return await service.get_user_chat_history(user1_id, user2_id)

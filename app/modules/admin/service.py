@@ -140,3 +140,10 @@ async def get_user_growth(filter_type: GrowthFilter):
             data_points.append({"label": str(year_start.year), "count": count})
 
     return {"data": data_points}
+
+async def get_user_chat_history(user1_id: int, user2_id: int):
+    """
+    Fetches the full chat history between any two users (Admin only).
+    """
+    from app.modules.messages.service import get_chat_history
+    return await get_chat_history(user1_id, user2_id)
