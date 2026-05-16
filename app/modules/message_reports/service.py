@@ -1,0 +1,106 @@
+from app.core.db import db
+from fastapi import HTTPException, UploadFile
+from app.modules.message_reports.schemas import MessageReportCreate, MessageReportResolveRequest
+from app.modules.reports.schemas import ReportAction
+from app.common.cloudinary import upload_image
+from prisma.enums import ReportStatus, AccountStatus
+
+async def create_message_report(reporter_id: int, reported_user_id: int, data: MessageReportCreate, file: UploadFile = None):
+    if reporter_id == reported_user_id:
+        raise HTTPException(status_code=400, detail="You cannot report yourself")
+        
+    reported_user = await db.user.find_unique(where={"id": reported_user_id})
+    if not reported_user:
+        raise HTTPException(status_code=404, detail="Reported user not found")
+        
+    image_url = None
+    if file:
+        upload_result = await upload_image(file, folder="jorden/message_reports")
+        if upload_result:
+            image_url = upload_result.get("secure_url")
+
+    report = await db.messagereport.create(
+        data={
+            "reason": data.reason,
+            "description": data.description,
+            "image_url": image_url,
+            "reporter": {"connect": {"id": reporter_id}},
+            "reportedUser": {"connect": {"id": reported_user_id}}
+        },
+        include={
+            "reporter": {"include": {"profile": True}},
+            "reportedUser": {"include": {"profile": True}}
+        }
+    )
+    
+    return report
+
+async def get_message_reports(status: str = None, page: int = 1, page_size: int = 10):
+    where = {}
+    if status:
+        where["status"] = status
+        
+    total = await db.messagereport.count(where=where)
+    
+    reports = await db.messagereport.find_many(
+        where=where,
+        include={
+            "reporter": {"include": {"profile": True}},
+            "reportedUser": {"include": {"profile": True}}
+        },
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
+    )
+    
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "reports": reports
+    }
+
+async def resolve_message_report(report_id: int, data: MessageReportResolveRequest):
+    report = await db.messagereport.find_unique(
+        where={"id": report_id},
+        include={"reportedUser": True}
+    )
+    
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+        
+    admin_action = data.adminAction
+    
+    if admin_action != ReportAction.DISMISS_REPORT:
+        # admin_action is an AccountStatus (ACTIVE, PENDING, DEACTIVE, SUSPEND, DELETE)
+        new_account_status = AccountStatus[admin_action.value]
+        
+        # Determine if we should increment tokenVersion (to force logout)
+        update_data = {"accountStatus": new_account_status}
+        if new_account_status in [AccountStatus.SUSPEND, AccountStatus.DELETE, AccountStatus.DEACTIVE]:
+            update_data["tokenVersion"] = {"increment": 1}
+            
+        # Update user status
+        await db.user.update(
+            where={"id": report.reportedUserId},
+            data=update_data
+        )
+        
+        display_action = admin_action.value
+    else:
+        display_action = "DISMISSED"
+
+    # Update report status
+    updated_report = await db.messagereport.update(
+        where={"id": report_id},
+        data={
+            "status": ReportStatus.RESOLVED,
+            "adminAction": display_action
+        },
+        include={
+            "reporter": {"include": {"profile": True}},
+            "reportedUser": {"include": {"profile": True}}
+        }
+    )
+    
+    return updated_report

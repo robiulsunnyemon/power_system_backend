@@ -47,6 +47,9 @@ model User {
   reportsMade       UserReport[] @relation("ReporterRelation")
   reportsReceived   UserReport[] @relation("ReportedUserRelation")
 
+  messageReportsMade     MessageReport[] @relation("MessageReporterRelation")
+  messageReportsReceived MessageReport[] @relation("MessageReportedUserRelation")
+
   bugReports        BugReport[]
 
   @@map("users")
@@ -426,5 +429,25 @@ model ArticleSection {
   updatedAt   DateTime @updatedAt
 
   @@map("article_sections")
+}
+
+model MessageReport {
+  id               Int          @id @default(autoincrement())
+  reason           ReportReason
+  description      String?      
+  image_url        String?
+  status           ReportStatus @default(PENDING)
+  adminAction      String?      
+  
+  reporterId       Int          
+  reporter         User         @relation("MessageReporterRelation", fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  reportedUserId   Int          
+  reportedUser     User         @relation("MessageReportedUserRelation", fields: [reportedUserId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@map("message_reports")
 }
 
