@@ -17,13 +17,18 @@ async def signup_user(data: SignupRequest, background_tasks: BackgroundTasks):
     otp = generate_otp()
     hashed_pwd = hash_password(data.password)
     
+    roles = [r.value for r in data.roles]
+    # Set lastActiveRole to the role if only one is provided, otherwise default to USER
+    last_active_role = roles[0] if len(roles) == 1 else "USER"
+    
     await db.user.create(
         data={
             "fullname": data.fullname,
             "email": data.email,
             "password": hashed_pwd,
             "isAgreed": data.isAgreed,
-            "roles": [r.value for r in data.roles],
+            "roles": roles,
+            "lastActiveRole": last_active_role,
             "otp": otp,
             "isVerified": False,
             "accountStatus": AccountStatus.PENDING,
@@ -97,6 +102,13 @@ async def login_user(data: LoginRequest):
             raise HTTPException(status_code=400, detail=f"User does not have the role: {data.role.value}")
         
         last_active_role = data.role.value
+        await db.user.update(
+            where={"id": user.id},
+            data={"lastActiveRole": last_active_role}
+        )
+    elif len(user.roles) == 1 and last_active_role != user.roles[0]:
+        # Auto-fix lastActiveRole if the user has only one role and it's not currently active
+        last_active_role = user.roles[0]
         await db.user.update(
             where={"id": user.id},
             data={"lastActiveRole": last_active_role}
