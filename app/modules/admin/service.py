@@ -2,6 +2,7 @@ from app.core.db import db
 from prisma.enums import Role, AccountStatus
 from app.modules.admin.schemas import UserRoleFilter, GrowthFilter
 from fastapi import HTTPException
+from app.core.websocket import manager
 from datetime import datetime, timedelta, timezone
 
 async def get_all_users(role_filter: UserRoleFilter):
@@ -25,6 +26,7 @@ async def get_all_users(role_filter: UserRoleFilter):
         user_dict["profile_image"] = user.profile.profile_image if user.profile else None
         user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
         user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
+        user_dict["is_online"] = manager.is_user_online(user.id)
         result.append(user_dict)
     
     return result
@@ -47,6 +49,7 @@ async def update_user_status(user_id: int, status):
     user_dict["profile_image"] = updated_user.profile.profile_image if updated_user.profile else None
     user_dict["trust_score"] = updated_user.profile.trust_score if updated_user.profile else 0
     user_dict["raw_score"] = updated_user.profile.raw_score if updated_user.profile else 0
+    user_dict["is_online"] = manager.is_user_online(user_id)
     return user_dict
 
 def calculate_growth_pct(current: int, previous: int) -> float:

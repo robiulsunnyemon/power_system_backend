@@ -19,4 +19,7 @@ class ConnectionManager:
             websocket = self.active_connections[user_id]
             await websocket.send_json(message)
 
+    def is_user_online(self, user_id: int) -> bool:
+        return user_id in self.active_connections
+
 manager = ConnectionManager()

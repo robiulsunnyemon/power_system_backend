@@ -15,6 +15,7 @@ class SellerProfileInfo(BaseModel):
     total_delivery: int
     average_rating: float
     positive: float
+    is_online: bool = False
 
 class SellerPublicProfileResponse(BaseModel):
     seller: SellerProfileInfo
@@ -35,6 +36,7 @@ class UserProfileResponse(BaseModel):
     profile_image: Optional[str] = None
     trust_score: float = 0.0
     raw_score: float = 0.0
+    is_online: bool = False
     createdAt: datetime
     updatedAt: datetime
 

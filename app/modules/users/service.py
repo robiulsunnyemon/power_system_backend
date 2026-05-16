@@ -5,6 +5,7 @@ from app.common.security import verify_password
 from fastapi import UploadFile, HTTPException
 from app.modules.products.service import format_product_response
 from prisma.enums import ProductStatus
+from app.core.websocket import manager
 
 async def get_seller_public_profile(seller_id: int):
     """
@@ -70,7 +71,8 @@ async def get_seller_public_profile(seller_id: int):
         "badge": badge,
         "total_delivery": total_delivery,
         "average_rating": round(avg_rating, 1),
-        "positive": round(positive_pct, 1)
+        "positive": round(positive_pct, 1),
+        "is_online": manager.is_user_online(seller.id)
     }
     
     # 4. Format Products
@@ -120,6 +122,7 @@ async def get_user_profile(user_id: int):
     user_dict["profile_image"] = user.profile.profile_image if user.profile else None
     user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
     user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
+    user_dict["is_online"] = manager.is_user_online(user_id)
     return user_dict
 
 async def update_user_profile(user_id: int, data: UpdateProfileRequest):
@@ -134,6 +137,7 @@ async def update_user_profile(user_id: int, data: UpdateProfileRequest):
     user_dict["profile_image"] = user.profile.profile_image if user.profile else None
     user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
     user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
+    user_dict["is_online"] = manager.is_user_online(user_id)
     return user_dict
 
 async def update_profile_image(user_id: int, file: UploadFile):
