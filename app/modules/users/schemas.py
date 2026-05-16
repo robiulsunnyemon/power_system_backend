@@ -53,5 +53,8 @@ class DeleteAccountRequest(BaseModel):
 class UserSummaryResponse(BaseModel):
     listings: int
     jobs_completed: int
+    total_order_delivery: int
+    total_review: int
     trust_score: float
+
 

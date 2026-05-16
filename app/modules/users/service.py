@@ -340,13 +340,19 @@ async def get_user_summary(user_id: int):
     
     total_jobs = delivered_orders + completed_services
     
-    # 3. Trust Score
+    # 3. Total Reviews Received
+    total_reviews = await db.review.count(where={"sellerId": user_id})
+    
+    # 4. Trust Score
     profile = await db.userprofile.find_unique(where={"userId": user_id})
     trust_score = profile.trust_score if profile else 0.0
     
     return {
         "listings": listings_count,
         "jobs_completed": total_jobs,
+        "total_order_delivery": delivered_orders,
+        "total_review": total_reviews,
         "trust_score": trust_score
     }
+
 
