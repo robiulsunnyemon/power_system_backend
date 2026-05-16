@@ -71,3 +71,10 @@ async def become_user(user_id: int = Depends(get_current_user_id)):
     Endpoint for a user to ensure they have the base USER role and get a fresh token.
     """
     return await service.become_user(user_id)
+
+@router.delete("/delete-account")
+async def delete_account(data: schemas.DeleteAccountRequest, user_id: int = Depends(get_current_user_id)):
+    """
+    Endpoint for a user to delete their own account.
+    """
+    return await service.delete_my_account(user_id, data)

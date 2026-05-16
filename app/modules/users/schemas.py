@@ -44,3 +44,6 @@ class UpdateProfileRequest(BaseModel):
     bio: Optional[str] = None
     longitude: Optional[float] = None
     latitude: Optional[float] = None
+
+class DeleteAccountRequest(BaseModel):
+    password: str

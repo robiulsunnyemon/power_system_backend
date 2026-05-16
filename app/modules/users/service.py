@@ -1,6 +1,7 @@
 from app.core.db import db
-from app.modules.users.schemas import UpdateProfileRequest
+from app.modules.users.schemas import UpdateProfileRequest, DeleteAccountRequest
 from app.common.cloudinary import upload_image, delete_image, get_public_id_from_url
+from app.common.security import verify_password
 from fastapi import UploadFile, HTTPException
 from app.modules.products.service import format_product_response
 from prisma.enums import ProductStatus
@@ -291,3 +292,20 @@ async def become_user(user_id: int):
         "token_type": "bearer",
         "last_active_role": "USER"
     }
+
+async def delete_my_account(user_id: int, data: DeleteAccountRequest):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not verify_password(data.password, user.password):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+        
+    await db.user.update(
+        where={"id": user_id},
+        data={
+            "accountStatus": "DELETE",
+            "tokenVersion": user.tokenVersion + 1
+        }
+    )
+    return {"message": "Account deleted successfully. You have been logged out."}
