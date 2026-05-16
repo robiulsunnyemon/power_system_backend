@@ -26,20 +26,29 @@ async def create_report(reporter_id: int, reported_user_id: int, data: ReportCre
     
     return report
 
-async def get_reports(status: str = None):
+async def get_reports(status: str = None, page: int = 1, page_size: int = 10):
     where = {}
     if status:
         where["status"] = status
         
+    total = await db.userreport.count(where=where)
+    
     reports = await db.userreport.find_many(
         where=where,
         include={
             "reporter": {"include": {"profile": True}},
             "reportedUser": {"include": {"profile": True}}
         },
-        order={"createdAt": "desc"}
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
     )
-    return reports
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "reports": reports
+    }
 
 async def resolve_report(report_id: int, data: ReportResolveRequest):
     report = await db.userreport.find_unique(

@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.modules.admin import service, schemas
 from app.modules.users.schemas import UserProfileResponse
-from app.modules.messages.schemas import MessageResponse
+from app.modules.messages.schemas import PaginatedMessageResponse
 from app.common.security import decode_token
 from app.core.db import db
 from typing import List
@@ -30,15 +30,17 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
     
     return user
 
-@router.get("/users", response_model=List[UserProfileResponse])
+@router.get("/users", response_model=schemas.PaginatedUserResponse)
 async def list_users(
     role: schemas.UserRoleFilter = schemas.UserRoleFilter.ALL,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     admin=Depends(get_current_admin)
 ):
     """
-    Endpoint to list all users with role filtering.
+    Endpoint to list all users with role filtering and pagination.
     """
-    return await service.get_all_users(role)
+    return await service.get_all_users(role, page, page_size)
 
 @router.patch("/users/{user_id}/status", response_model=UserProfileResponse)
 async def update_status(
@@ -68,13 +70,15 @@ async def get_growth(
     """
     return await service.get_user_growth(filter)
 
-@router.get("/chat-history/{user1_id}/{user2_id}", response_model=List[MessageResponse])
+@router.get("/chat-history/{user1_id}/{user2_id}", response_model=PaginatedMessageResponse)
 async def get_user_chat_history(
     user1_id: int,
     user2_id: int,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     admin=Depends(get_current_admin)
 ):
     """
-    Endpoint for admin to get chat history between any two users.
+    Endpoint for admin to get chat history between any two users with pagination.
     """
-    return await service.get_user_chat_history(user1_id, user2_id)
+    return await service.get_user_chat_history(user1_id, user2_id, page, page_size)

@@ -39,16 +39,18 @@ async def create_product(
     """
     return await service.create_product(seller_id, data)
 
-@router.get("/products/my", response_model=schemas.SellerProductsResponse)
+@router.get("/products/my", response_model=schemas.PaginatedSellerProductsResponse)
 async def get_my_products(
     product_id: Optional[int] = Query(None, description="Optional: Filter by a specific product ID"),
     status: schemas.ProductStatusFilter = schemas.ProductStatusFilter.ALL,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     seller_id: int = Depends(check_seller_role)
 ):
     """
-    Endpoint for sellers to see their own products with status counts and filtering.
+    Endpoint for sellers to see their own products with status counts, filtering and pagination.
     """
-    return await service.get_seller_products(seller_id, status, product_id)
+    return await service.get_seller_products(seller_id, status, product_id, page, page_size)
 
 @router.get("/products", response_model=schemas.PaginatedProductResponse)
 async def list_products(

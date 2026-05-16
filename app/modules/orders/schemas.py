@@ -43,6 +43,12 @@ class OrderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class PaginatedOrderResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    orders: List[OrderResponse]
+
 class ProductOrdersResponse(BaseModel):
     total_order: int
     total_accept_order: int

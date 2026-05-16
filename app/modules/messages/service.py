@@ -36,14 +36,12 @@ async def save_message(sender_id: int, data: MessageCreate):
     
     return message
 
-async def get_conversations(user_id: int):
+async def get_conversations(user_id: int, page: int = 1, page_size: int = 10):
     """
-    Fetches a list of conversations for the user.
+    Fetches a list of conversations for the user with pagination.
     Each conversation includes the last message and unread count.
     """
     # 1. Get all messages where the user is either sender or receiver
-    # This is a bit complex in Prisma without raw SQL for grouping by conversation partner.
-    # We'll fetch the messages and group them in Python for simplicity in this small app.
     messages = await db.message.find_many(
         where={
             "OR": [
@@ -85,22 +83,51 @@ async def get_conversations(user_id: int):
                 "is_online": manager.is_user_online(other_id)
             }
             
-    return list(conversations_dict.values())
+    all_conversations = list(conversations_dict.values())
+    total = len(all_conversations)
+    
+    # Apply pagination
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_list = all_conversations[start:end]
 
-async def get_chat_history(user_id: int, other_user_id: int):
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "conversations": paginated_list
+    }
+
+async def get_chat_history(user_id: int, other_user_id: int, page: int = 1, page_size: int = 20):
     """
-    Fetches the full chat history between two users.
+    Fetches the full chat history between two users with pagination.
     """
+    where = {
+        "OR": [
+            {"senderId": user_id, "receiverId": other_user_id},
+            {"senderId": other_user_id, "receiverId": user_id}
+        ]
+    }
+    
+    total = await db.message.count(where=where)
+    
     messages = await db.message.find_many(
-        where={
-            "OR": [
-                {"senderId": user_id, "receiverId": other_user_id},
-                {"senderId": other_user_id, "receiverId": user_id}
-            ]
-        },
-        order={"createdAt": "asc"}
+        where=where,
+        skip=(page - 1) * page_size,
+        take=page_size,
+        order={"createdAt": "desc"} # Usually chat list is fetched desc for pagination, but history is asc.
+        # Actually, for chat apps, you usually fetch latest messages first (desc) and then reverse on client.
     )
-    return messages
+    
+    # Sort them back to ASC for the client
+    messages.sort(key=lambda x: x.createdAt)
+    
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "messages": messages
+    }
 
 async def mark_messages_as_read(receiver_id: int, sender_id: int):
     """

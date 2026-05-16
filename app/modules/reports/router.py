@@ -27,15 +27,17 @@ async def report_user_endpoint(
     """
     return await service.create_report(reporter_id, user_id, data)
 
-@router.get("/", response_model=List[schemas.ReportResponse])
+@router.get("/", response_model=schemas.PaginatedReportResponse)
 async def get_reports_endpoint(
     status: Optional[ReportStatus] = Query(None, description="Filter by report status"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     admin_id: int = Depends(check_admin_role)
 ):
     """
-    Admin endpoint to view all reports.
+    Admin endpoint to view all reports with pagination.
     """
-    return await service.get_reports(status)
+    return await service.get_reports(status, page, page_size)
 
 @router.patch("/{report_id}/resolve", response_model=schemas.ReportResponse)
 async def resolve_report_endpoint(

@@ -41,17 +41,26 @@ async def create_bug_report(user_id: int, data: BugReportCreate, file: UploadFil
     )
     return format_bug_response(bug)
 
-async def get_bug_reports(status: BugStatus = None):
+async def get_bug_reports(status: BugStatus = None, page: int = 1, page_size: int = 10):
     where = {}
     if status:
         where["status"] = status
         
+    total = await db.bugreport.count(where=where)
+    
     bugs = await db.bugreport.find_many(
         where=where,
         include={"reporter": {"include": {"profile": True}}},
-        order={"createdAt": "desc"}
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
     )
-    return [format_bug_response(b) for b in bugs]
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "bugs": [format_bug_response(b) for b in bugs]
+    }
 
 async def resolve_bug_report(bug_id: int, data: BugReportResolve):
     bug = await db.bugreport.find_unique(where={"id": bug_id})

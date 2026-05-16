@@ -40,3 +40,9 @@ class ReportResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PaginatedReportResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    reports: List[ReportResponse]

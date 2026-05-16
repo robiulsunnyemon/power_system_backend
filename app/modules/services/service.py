@@ -74,29 +74,36 @@ async def create_service(provider_id: int, data: ServiceCreate):
     
     return format_service_response(service)
 
-async def get_provider_services(provider_id: int, status_filter: str = "ALL"):
+async def get_provider_services(provider_id: int, status_filter: str = "ALL", page: int = 1, page_size: int = 10):
     """
-    Returns all services belonging to a specific provider.
+    Returns all services belonging to a specific provider with pagination.
     """
-    all_services = await db.service.find_many(
-        where={"providerId": provider_id},
-        include={"provider": {"include": {"profile": True}}},
-        order={"createdAt": "desc"}
-    )
-    
-    total_active = sum(1 for s in all_services if s.status == ServiceStatus.PUBLISHED)
-    total_draft = sum(1 for s in all_services if s.status == ServiceStatus.DRAFT)
-    
+    where = {"providerId": provider_id}
     if status_filter != "ALL":
-        filtered_services = [s for s in all_services if s.status == status_filter]
-    else:
-        filtered_services = all_services
+        where["status"] = status_filter
+        
+    total = await db.service.count(where=where)
+    
+    # Counts for the whole provider (regardless of filter)
+    all_provider_services = await db.service.find_many(where={"providerId": provider_id})
+    total_active = sum(1 for s in all_provider_services if s.status == ServiceStatus.PUBLISHED)
+    total_draft = sum(1 for s in all_provider_services if s.status == ServiceStatus.DRAFT)
+    
+    services = await db.service.find_many(
+        where=where,
+        include={"provider": {"include": {"profile": True}}},
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
+    )
         
     return {
-        "total_services": len(all_services),
+        "total": total,
+        "page": page,
+        "page_size": page_size,
         "total_active": total_active,
         "total_draft": total_draft,
-        "services": [format_service_response(s) for s in filtered_services]
+        "services": [format_service_response(s) for s in services]
     }
 
 async def get_all_services(

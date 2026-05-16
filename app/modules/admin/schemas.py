@@ -3,12 +3,20 @@ from enum import Enum
 from typing import List
 from prisma.enums import AccountStatus
 
+from app.modules.users.schemas import UserProfileResponse
+
 class UserRoleFilter(str, Enum):
     ALL = "ALL"
     USER = "USER"
     SELLER = "SELLER"
     SERVICE_PROVIDER = "SERVICE_PROVIDER"
     ADMIN = "ADMIN"
+
+class PaginatedUserResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    users: List[UserProfileResponse]
 
 class UpdateStatusRequest(BaseModel):
     accountStatus: AccountStatus

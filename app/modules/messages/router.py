@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, UploadFile, File, Query
 from typing import List
 from app.modules.messages import service, schemas
 from app.modules.users.router import get_current_user_id
@@ -71,19 +71,28 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
         print(f"WS Error: {e}")
         manager.disconnect(user_id)
 
-@router.get("/conversations", response_model=List[schemas.ConversationResponse])
-async def get_conversations(user_id: int = Depends(get_current_user_id)):
+@router.get("/conversations", response_model=schemas.PaginatedConversationResponse)
+async def get_conversations(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    user_id: int = Depends(get_current_user_id)
+):
     """
-    Returns a list of all conversations for the logged-in user.
+    Returns a list of all conversations for the logged-in user with pagination.
     """
-    return await service.get_conversations(user_id)
+    return await service.get_conversations(user_id, page, page_size)
 
-@router.get("/history/{other_user_id}", response_model=List[schemas.MessageResponse])
-async def get_chat_history(other_user_id: int, user_id: int = Depends(get_current_user_id)):
+@router.get("/history/{other_user_id}", response_model=schemas.PaginatedMessageResponse)
+async def get_chat_history(
+    other_user_id: int, 
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user_id: int = Depends(get_current_user_id)
+):
     """
-    Returns the full chat history between the current user and another user.
+    Returns the chat history between the current user and another user with pagination.
     """
-    return await service.get_chat_history(user_id, other_user_id)
+    return await service.get_chat_history(user_id, other_user_id, page, page_size)
 
 @router.patch("/read/{sender_id}")
 async def mark_as_read(sender_id: int, user_id: int = Depends(get_current_user_id)):

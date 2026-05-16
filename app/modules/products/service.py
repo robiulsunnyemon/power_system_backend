@@ -109,17 +109,19 @@ async def create_product(seller_id: int, data: ProductCreate):
     
     return format_product_response(product)
 
-async def get_seller_products(seller_id: int, status_filter: str = "ALL", product_id: Optional[int] = None):
+async def get_seller_products(
+    seller_id: int, 
+    status_filter: str = "ALL", 
+    product_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 10
+):
     """
-    Returns all products belonging to a specific seller with status counts and optional filtering.
+    Returns all products belonging to a specific seller with status counts and optional filtering, with pagination.
     """
+    # 1. Fetch all for counts
     all_products = await db.product.find_many(
         where={"sellerId": seller_id},
-        include={
-            "category": True, 
-            "seller": {"include": {"profile": True, "reviews_received": True}},
-            "orders": {"where": {"status": {"in": [OrderStatus.PENDING, OrderStatus.DELIVERED]}}}
-        },
         order={"createdAt": "desc"}
     )
     
@@ -130,23 +132,43 @@ async def get_seller_products(seller_id: int, status_filter: str = "ALL", produc
     total_deleted = sum(1 for p in all_products if p.status == ProductStatus.DELETED)
     total_soldout = sum(1 for p in all_products if p.status == ProductStatus.SOLDOUT)
     
-    # Apply filter to the list
-    filtered_products = all_products
-    
+    # 2. Prepare query for paginated results
+    where = {"sellerId": seller_id}
     if product_id:
-        filtered_products = [p for p in filtered_products if p.id == product_id]
-        
+        where["id"] = product_id
     if status_filter != "ALL":
-        filtered_products = [p for p in filtered_products if p.status == status_filter]
+        where["status"] = status_filter
+        
+    total_filtered = await db.product.count(where=where)
     
-    return {
+    paginated_products = await db.product.find_many(
+        where=where,
+        include={
+            "category": True, 
+            "seller": {"include": {"profile": True, "reviews_received": True}},
+            "orders": {"where": {"status": {"in": [OrderStatus.PENDING, OrderStatus.DELIVERED]}}}
+        },
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
+    )
+    
+    counts = {
         "total_products": len(all_products),
         "total_active": total_active,
         "total_draft": total_draft,
         "total_inactive": total_inactive,
         "total_deleted": total_deleted,
         "total_soldout": total_soldout,
-        "products": [format_product_response(p) for p in filtered_products]
+        "products": [] # Placeholder for schema compatibility
+    }
+    
+    return {
+        "total": total_filtered,
+        "page": page,
+        "page_size": page_size,
+        "counts": counts,
+        "products": [format_product_response(p) for p in paginated_products]
     }
 
 async def get_all_products(

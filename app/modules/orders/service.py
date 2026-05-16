@@ -90,9 +90,9 @@ async def get_buyer_orders(user_id: int, status_filter: str = "ALL", order_id: O
     )
     return [format_order_response(o) for o in orders]
 
-async def get_seller_all_orders(seller_id: int, status_filter: str = "ALL"):
+async def get_seller_all_orders(seller_id: int, status_filter: str = "ALL", page: int = 1, page_size: int = 10):
     """
-    Returns all orders for all products belonging to a specific seller with tracking, optionally filtered by status.
+    Returns all orders for all products belonging to a specific seller with tracking, optionally filtered by status and paginated.
     """
     where = {
         "product": {
@@ -102,6 +102,8 @@ async def get_seller_all_orders(seller_id: int, status_filter: str = "ALL"):
     if status_filter != "ALL":
         where["status"] = status_filter
 
+    total = await db.order.count(where=where)
+
     orders = await db.order.find_many(
         where=where,
         include={
@@ -109,9 +111,16 @@ async def get_seller_all_orders(seller_id: int, status_filter: str = "ALL"):
             "user": {"include": {"profile": True}},
             "tracking": True
         },
-        order={"createdAt": "desc"}
+        order={"createdAt": "desc"},
+        skip=(page - 1) * page_size,
+        take=page_size
     )
-    return [format_order_response(o) for o in orders]
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "orders": [format_order_response(o) for o in orders]
+    }
 
 async def get_orders_by_product(seller_id: int, product_id: int, status_filter: str = "ALL"):
     """

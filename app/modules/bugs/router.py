@@ -33,15 +33,17 @@ async def create_bug(
     )
     return await service.create_bug_report(user_id, data, file)
 
-@router.get("/", response_model=List[schemas.BugReportResponse])
+@router.get("/", response_model=schemas.PaginatedBugReportResponse)
 async def list_bugs(
     status: Optional[BugStatus] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     admin=Depends(get_current_admin)
 ):
     """
-    Admin only: List all bug reports.
+    Admin only: List all bug reports with pagination.
     """
-    return await service.get_bug_reports(status)
+    return await service.get_bug_reports(status, page, page_size)
 
 @router.patch("/{bug_id}/resolve", response_model=schemas.BugReportResponse)
 async def resolve_bug(

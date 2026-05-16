@@ -39,3 +39,9 @@ class BugReportResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PaginatedBugReportResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    bugs: List[BugReportResponse]

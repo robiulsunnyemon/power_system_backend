@@ -5,18 +5,23 @@ from fastapi import HTTPException
 from app.core.websocket import manager
 from datetime import datetime, timedelta, timezone
 
-async def get_all_users(role_filter: UserRoleFilter):
+async def get_all_users(role_filter: UserRoleFilter, page: int = 1, page_size: int = 10):
     """
-    Fetches all users with their profile data, optionally filtered by role.
+    Fetches all users with their profile data, optionally filtered by role, with pagination.
     """
     query = {}
     if role_filter != UserRoleFilter.ALL:
         # Map the filter enum to the Prisma Role enum
         query["roles"] = {"has": Role(role_filter.value)}
     
+    total = await db.user.count(where=query)
+    
     users = await db.user.find_many(
         where=query,
-        include={"profile": True}
+        include={"profile": True},
+        skip=(page - 1) * page_size,
+        take=page_size,
+        order={"createdAt": "desc"}
     )
     
     # Flatten the profile_image into the response format
@@ -29,7 +34,12 @@ async def get_all_users(role_filter: UserRoleFilter):
         user_dict["is_online"] = manager.is_user_online(user.id)
         result.append(user_dict)
     
-    return result
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "users": result
+    }
 
 async def update_user_status(user_id: int, status):
     """
@@ -141,9 +151,9 @@ async def get_user_growth(filter_type: GrowthFilter):
 
     return {"data": data_points}
 
-async def get_user_chat_history(user1_id: int, user2_id: int):
+async def get_user_chat_history(user1_id: int, user2_id: int, page: int = 1, page_size: int = 20):
     """
-    Fetches the full chat history between any two users (Admin only).
+    Fetches the full chat history between any two users (Admin only) with pagination.
     """
     from app.modules.messages.service import get_chat_history
-    return await get_chat_history(user1_id, user2_id)
+    return await get_chat_history(user1_id, user2_id, page, page_size)

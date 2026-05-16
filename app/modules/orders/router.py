@@ -42,15 +42,17 @@ async def list_my_orders(
 
 # --- SELLERS ENDPOINTS ---
 
-@router.get("/seller/all", response_model=List[schemas.OrderResponse], tags=["Orders - Seller"])
+@router.get("/seller/all", response_model=schemas.PaginatedOrderResponse, tags=["Orders - Seller"])
 async def list_all_seller_orders(
     status: schemas.OrderStatusFilter = Query(schemas.OrderStatusFilter.ALL),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
     seller_id: int = Depends(check_seller_role)
 ):
     """
-    Endpoint for sellers to see all orders for all of their products.
+    Endpoint for sellers to see all orders for all of their products with pagination.
     """
-    return await service.get_seller_all_orders(seller_id, status)
+    return await service.get_seller_all_orders(seller_id, status, page, page_size)
 
 @router.get("/seller/product/{product_id}", response_model=schemas.ProductOrdersResponse, tags=["Orders - Seller"])
 async def list_orders_by_product(
