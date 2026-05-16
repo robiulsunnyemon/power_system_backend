@@ -1,4 +1,5 @@
 from app.core.db import db
+from app.core.websocket import manager
 from app.modules.messages.schemas import MessageCreate
 from fastapi import UploadFile, HTTPException
 from app.common.cloudinary import upload_image
@@ -80,7 +81,8 @@ async def get_conversations(user_id: int):
                 "other_user_image": other_user.profile.profile_image if other_user.profile else None,
                 "last_message": msg.content if msg.type == "TEXT" else "[File]",
                 "last_message_time": msg.createdAt,
-                "unread_count": unread_count
+                "unread_count": unread_count,
+                "is_online": manager.is_user_online(other_id)
             }
             
     return list(conversations_dict.values())

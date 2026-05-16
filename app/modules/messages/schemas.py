@@ -31,6 +31,7 @@ class ConversationResponse(BaseModel):
     last_message: str
     last_message_time: datetime
     unread_count: int
+    is_online: bool = False
 
 class FileUploadResponse(BaseModel):
     url: str
