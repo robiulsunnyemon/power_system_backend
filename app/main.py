@@ -14,6 +14,8 @@ from app.modules.reports.router import router as reports_router
 from app.modules.settings.router import router as settings_router
 from app.modules.bugs.router import router as bugs_router
 from app.modules.notifications.router import router as notifications_router
+from app.modules.faq.router import router as faq_router
+from app.modules.articles.router import router as articles_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -51,6 +53,8 @@ app.include_router(reports_router)
 app.include_router(settings_router)
 app.include_router(bugs_router)
 app.include_router(notifications_router)
+app.include_router(faq_router)
+app.include_router(articles_router)
 
 @app.get("/")
 async def root():

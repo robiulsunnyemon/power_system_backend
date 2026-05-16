@@ -405,3 +405,26 @@ model UserReport {
   @@map("user_reports")
 }
 
+model FAQ {
+  id        Int      @id @default(autoincrement())
+  question  String
+  answer    String
+  category  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("faqs")
+}
+
+model ArticleSection {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  category    String
+  image_url   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("article_sections")
+}
+
