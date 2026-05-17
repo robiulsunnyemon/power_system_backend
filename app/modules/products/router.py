@@ -64,6 +64,19 @@ async def list_products(
     """
     return await service.get_all_products(category, product_id, page, page_size)
 
+@router.get("/products/search", response_model=schemas.PaginatedProductResponse)
+async def search_products_endpoint(
+    query: Optional[str] = Query(None, description="Search query string (matches any word in title or description)"),
+    category_id: Optional[int] = Query(None, description="Optional Category ID to filter products"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100)
+):
+    """
+    Public search endpoint to search active products matching keywords in title or description,
+    optionally filtered by Category ID, with pagination.
+    """
+    return await service.search_products(query, category_id, page, page_size)
+
 @router.get("/categories", response_model=List[schemas.CategoryResponse])
 async def list_categories():
     """

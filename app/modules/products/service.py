@@ -239,3 +239,50 @@ async def delete_product(seller_id: int, product_id: int, hard_delete: bool = Fa
             data={"status": ProductStatus.DELETED}
         )
         return {"message": "Product status updated to DELETED (soft delete)"}
+
+async def search_products(
+    query_str: Optional[str] = None,
+    category_id: Optional[int] = None,
+    page: int = 1,
+    page_size: int = 10
+):
+    """
+    Search for ACTIVE products.
+    Matches any word from query_str in title OR description (case-insensitive).
+    Optionally filters by category_id.
+    """
+    # 1. Start with ACTIVE products
+    query = {"status": ProductStatus.ACTIVE}
+
+    # 2. Add Category Filter if provided
+    if category_id is not None:
+        query["categoryId"] = category_id
+
+    # 3. Add Any Word Matching Query Filter
+    if query_str and query_str.strip():
+        words = query_str.strip().split()
+        or_conditions = []
+        for word in words:
+            or_conditions.append({"title": {"contains": word, "mode": "insensitive"}})
+            or_conditions.append({"description": {"contains": word, "mode": "insensitive"}})
+        query["OR"] = or_conditions
+
+    # 4. Get Total Count
+    total_count = await db.product.count(where=query)
+
+    # 5. Get Paginated Products
+    skip = (page - 1) * page_size
+    products = await db.product.find_many(
+        where=query,
+        include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
+        order={"createdAt": "desc"},
+        skip=skip,
+        take=page_size
+    )
+
+    return {
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "products": [format_product_response(p) for p in products]
+    }
