@@ -88,9 +88,10 @@ async def apply_for_service(client_id: int, service_id: int, data: ServiceApplic
 
     return format_application_response(application)
 
-async def get_service_applications(provider_id: int, service_id: int = None, status: ApplicationStatus = ApplicationStatus.PENDING):
+async def get_service_applications(provider_id: int, service_id: int = None, status: Optional[ApplicationStatus] = None):
     """
     Returns applications and status counts for a provider's services.
+    If status is None, returns all applications regardless of status.
     """
     import asyncio
 
@@ -100,8 +101,11 @@ async def get_service_applications(provider_id: int, service_id: int = None, sta
     if service_id:
         base_where["serviceId"] = service_id
 
-    # Filtered applications for the current active request view
-    where = {**base_where, "status": status}
+    # Filtered applications: apply status filter only if a specific status is provided
+    where = {**base_where}
+    if status is not None:
+        where["status"] = status
+
     applications = await db.serviceapplication.find_many(
         where=where,
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True},

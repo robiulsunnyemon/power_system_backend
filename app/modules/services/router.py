@@ -1,9 +1,9 @@
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
-from typing import List
-from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse, ServiceCategoryListResponse
+from typing import List, Optional
+from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse, ServiceCategoryListResponse, ProviderServicesResponse
 from app.modules.services.service import (
-    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories
+    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories, search_services
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -30,7 +30,7 @@ async def create_service_endpoint(
 ):
     return await create_service(provider_id, data)
 
-@router.get("/my-services", response_model=PaginatedServiceResponse, status_code=status.HTTP_200_OK)
+@router.get("/my-services", response_model=ProviderServicesResponse, status_code=status.HTTP_200_OK)
 async def get_my_services_endpoint(
     status: str = Query("ALL", description="Filter by status (ALL, DRAFT, PUBLISHED, PAUSED, CLOSED.)"),
     page: int = Query(1, ge=1),
@@ -46,6 +46,19 @@ async def get_all_services_endpoint(
     page_size: int = Query(10, ge=1, le=100)
 ):
     return await get_all_services(category, page, page_size)
+
+@router.get("/search", response_model=PaginatedServiceResponse, status_code=status.HTTP_200_OK)
+async def search_services_endpoint(
+    query: Optional[str] = Query(None, description="Search query string (matches any word in title or description)"),
+    category: Optional[str] = Query(None, description="Optional category name to filter services"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100)
+):
+    """
+    Public search endpoint to search published services matching keywords in title or description,
+    optionally filtered by Category Name, with pagination.
+    """
+    return await search_services(query, category, page, page_size)
 
 @router.get("/categories", response_model=ServiceCategoryListResponse, status_code=status.HTTP_200_OK)
 async def get_service_categories_endpoint():

@@ -67,5 +67,17 @@ class PaginatedServiceResponse(BaseModel):
     page_size: int
     services: List[ServiceResponse]
 
+class ProviderServicesResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    average_rating: float
+    total_published: int
+    total_draft: int
+    total_paused: int
+    total_closed: int
+    total_pending_requests: int
+    services: List[ServiceResponse]
+
 class ServiceCategoryListResponse(BaseModel):
     categories: List[str]

@@ -76,7 +76,7 @@ async def create_service(provider_id: int, data: ServiceCreate):
 
 async def get_provider_services(provider_id: int, status_filter: str = "ALL", page: int = 1, page_size: int = 10):
     """
-    Returns all services belonging to a specific provider with pagination.
+    Returns all services belonging to a specific provider with pagination and extra provider statistics.
     """
     where = {"providerId": provider_id}
     if status_filter != "ALL":
@@ -84,11 +84,27 @@ async def get_provider_services(provider_id: int, status_filter: str = "ALL", pa
         
     total = await db.service.count(where=where)
     
-    # Counts for the whole provider (regardless of filter)
+    # 1. Counts for the whole provider (regardless of filter)
     all_provider_services = await db.service.find_many(where={"providerId": provider_id})
-    total_active = sum(1 for s in all_provider_services if s.status == ServiceStatus.PUBLISHED)
+    total_published = sum(1 for s in all_provider_services if s.status == ServiceStatus.PUBLISHED)
     total_draft = sum(1 for s in all_provider_services if s.status == ServiceStatus.DRAFT)
+    total_paused = sum(1 for s in all_provider_services if s.status == ServiceStatus.PAUSED)
+    total_closed = sum(1 for s in all_provider_services if s.status == ServiceStatus.CLOSED)
     
+    # 2. Get Average Rating from ProviderStats
+    stats = await db.providerstats.find_unique(where={"providerId": provider_id})
+    average_rating = stats.averageRating if stats else 0.0
+
+    # 3. Get Total Pending Requests from Users
+    from prisma.enums import ApplicationStatus
+    total_pending_requests = await db.serviceapplication.count(
+        where={
+            "service": {"providerId": provider_id},
+            "status": ApplicationStatus.PENDING
+        }
+    )
+    
+    # 4. Fetch Paginated Services
     services = await db.service.find_many(
         where=where,
         include={"provider": {"include": {"profile": True}}},
@@ -101,8 +117,12 @@ async def get_provider_services(provider_id: int, status_filter: str = "ALL", pa
         "total": total,
         "page": page,
         "page_size": page_size,
-        "total_active": total_active,
+        "average_rating": average_rating,
+        "total_published": total_published,
         "total_draft": total_draft,
+        "total_paused": total_paused,
+        "total_closed": total_closed,
+        "total_pending_requests": total_pending_requests,
         "services": [format_service_response(s) for s in services]
     }
 
@@ -213,3 +233,50 @@ async def get_published_service_categories():
     categories = [item["category"] for item in grouped if item["category"]]
     
     return {"categories": categories}
+
+async def search_services(
+    query_str: Optional[str] = None,
+    category: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10
+):
+    """
+    Search for PUBLISHED services.
+    Matches any word from query_str in title OR description (case-insensitive).
+    Optionally filters by category name.
+    """
+    # 1. Start with PUBLISHED services
+    query = {"status": ServiceStatus.PUBLISHED}
+
+    # 2. Add Category Filter if provided
+    if category is not None:
+        query["category"] = category.strip()
+
+    # 3. Add Any Word Matching Query Filter
+    if query_str and query_str.strip():
+        words = query_str.strip().split()
+        or_conditions = []
+        for word in words:
+            or_conditions.append({"title": {"contains": word, "mode": "insensitive"}})
+            or_conditions.append({"description": {"contains": word, "mode": "insensitive"}})
+        query["OR"] = or_conditions
+
+    # 4. Get Total Count
+    total_count = await db.service.count(where=query)
+
+    # 5. Get Paginated Services
+    skip = (page - 1) * page_size
+    services = await db.service.find_many(
+        where=query,
+        include={"provider": {"include": {"profile": True}}},
+        order={"createdAt": "desc"},
+        skip=skip,
+        take=page_size
+    )
+
+    return {
+        "total": total_count,
+        "page": page,
+        "page_size": page_size,
+        "services": [format_service_response(s) for s in services]
+    }

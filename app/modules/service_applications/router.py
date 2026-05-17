@@ -59,10 +59,12 @@ async def get_my_applications_endpoint(
 @router.get("/provider/requests", response_model=ProviderRequestsResponse)
 async def get_provider_requests_endpoint(
     service_id: Optional[int] = Query(None, description="Filter requests by a specific service"),
-    status: ApplicationStatus = Query(ApplicationStatus.PENDING, description="Filter requests by status (PENDING, ACCEPTED, DECLINED, COMPLETED)"),
+    status: ApplicationStatusFilter = Query(ApplicationStatusFilter.ALL, description="Filter requests by status (ALL, PENDING, ACCEPTED, DECLINED, COMPLETED)"),
     provider_id: int = Depends(check_provider_role)
 ):
-    return await get_service_applications(provider_id, service_id, status)
+    # Convert ALL to None so the service fetches all applications regardless of status
+    status_filter = None if status == ApplicationStatusFilter.ALL else ApplicationStatus[status.value]
+    return await get_service_applications(provider_id, service_id, status_filter)
 
 @router.patch("/provider/requests/{application_id}/status", response_model=ServiceApplicationResponse)
 async def update_request_status_endpoint(
