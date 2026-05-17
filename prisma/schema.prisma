@@ -51,6 +51,10 @@ model User {
   messageReportsReceived MessageReport[] @relation("MessageReportedUserRelation")
 
   bugReports        BugReport[]
+  
+  serviceReviewsGiven     ServiceReview[] @relation("ClientServiceReviews")
+  serviceReviewsReceived  ServiceReview[] @relation("ProviderServiceReviews")
+  providerStats           ProviderStats?
 
   @@map("users")
 }
@@ -282,6 +286,7 @@ model ServiceApplication {
   client            User                  @relation("ClientApplications", fields: [clientId], references: [id], onDelete: Cascade)
 
   tracking          ApplicationTracking[]
+  review            ServiceReview?
 
   @@map("service_applications")
 }
@@ -449,5 +454,36 @@ model MessageReport {
   updatedAt        DateTime     @updatedAt
 
   @@map("message_reports")
+}
+
+model ServiceReview {
+  id            Int                @id @default(autoincrement())
+  rating        Int
+  comment       String?
+  images        String[]
+  createdAt     DateTime           @default(now())
+
+  applicationId Int                @unique
+  application   ServiceApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  clientId      Int
+  client        User               @relation("ClientServiceReviews", fields: [clientId], references: [id], onDelete: Cascade)
+
+  providerId    Int
+  provider      User               @relation("ProviderServiceReviews", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("service_reviews")
+}
+
+model ProviderStats {
+  id            Int   @id @default(autoincrement())
+  totalRating   Int   @default(0)
+  averageRating Float @default(0.0)
+  totalReviews  Int   @default(0)
+
+  providerId    Int   @unique
+  provider      User  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@map("provider_stats")
 }
 
