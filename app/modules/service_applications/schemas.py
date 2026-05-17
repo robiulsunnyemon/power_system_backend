@@ -79,3 +79,11 @@ class ProviderEarningsResponse(BaseModel):
     pending_earnings: float
     quick_stats: EarningsQuickStats
     history: List[EarningsHistoryItem]
+
+class ProviderRequestsResponse(BaseModel):
+    pending_count: int
+    accepted_count: int
+    declined_count: int
+    completed_count: int
+    requests: List[ServiceApplicationResponse]
+

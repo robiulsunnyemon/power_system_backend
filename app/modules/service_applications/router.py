@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
 from typing import List, Optional
 from app.modules.service_applications.schemas import (
     ServiceApplicationCreate, ServiceApplicationResponse, ServiceApplicationStatusUpdate,
-    ProviderEarningsResponse, ApplicationStatusFilter
+    ProviderEarningsResponse, ApplicationStatusFilter, ProviderRequestsResponse
 )
 from app.modules.service_applications.service import (
     apply_for_service, get_service_applications, get_client_applications, update_application_status,
@@ -56,7 +56,7 @@ async def get_my_applications_endpoint(
 ):
     return await get_client_applications(client_id, application_id, status)
 
-@router.get("/provider/requests", response_model=List[ServiceApplicationResponse])
+@router.get("/provider/requests", response_model=ProviderRequestsResponse)
 async def get_provider_requests_endpoint(
     service_id: Optional[int] = Query(None, description="Filter requests by a specific service"),
     status: ApplicationStatus = Query(ApplicationStatus.PENDING, description="Filter requests by status (PENDING, ACCEPTED, DECLINED, COMPLETED)"),

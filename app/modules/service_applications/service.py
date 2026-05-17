@@ -90,21 +90,41 @@ async def apply_for_service(client_id: int, service_id: int, data: ServiceApplic
 
 async def get_service_applications(provider_id: int, service_id: int = None, status: ApplicationStatus = ApplicationStatus.PENDING):
     """
-    Returns applications for a provider's services.
+    Returns applications and status counts for a provider's services.
     """
-    where = {
-        "service": {"providerId": provider_id},
-        "status": status
+    import asyncio
+
+    base_where = {
+        "service": {"providerId": provider_id}
     }
     if service_id:
-        where["serviceId"] = service_id
+        base_where["serviceId"] = service_id
 
+    # Filtered applications for the current active request view
+    where = {**base_where, "status": status}
     applications = await db.serviceapplication.find_many(
         where=where,
         include={"service": {"include": {"provider": {"include": {"profile": True}}}}, "client": {"include": {"profile": True}}, "tracking": True},
         order={"createdAt": "desc"}
     )
-    return [format_application_response(a) for a in applications]
+
+    # Calculate status counts in parallel
+    pending_task = db.serviceapplication.count(where={**base_where, "status": ApplicationStatus.PENDING})
+    accepted_task = db.serviceapplication.count(where={**base_where, "status": ApplicationStatus.ACCEPTED})
+    declined_task = db.serviceapplication.count(where={**base_where, "status": ApplicationStatus.DECLINED})
+    completed_task = db.serviceapplication.count(where={**base_where, "status": ApplicationStatus.COMPLETED})
+
+    pending_count, accepted_count, declined_count, completed_count = await asyncio.gather(
+        pending_task, accepted_task, declined_task, completed_task
+    )
+
+    return {
+        "pending_count": pending_count,
+        "accepted_count": accepted_count,
+        "declined_count": declined_count,
+        "completed_count": completed_count,
+        "requests": [format_application_response(a) for a in applications]
+    }
 
 async def get_client_applications(client_id: int, application_id: Optional[int] = None, status: str = "ALL"):
     """
