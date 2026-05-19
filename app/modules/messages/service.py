@@ -63,6 +63,10 @@ async def get_conversations(user_id: int, page: int = 1, page_size: int = 10):
         other_user = msg.receiver if msg.senderId == user_id else msg.sender
         other_id = other_user.id
         
+        # Skip self-conversations
+        if other_id == user_id:
+            continue
+        
         if other_id not in conversations_dict:
             # First time seeing this conversation partner (since we ordered by desc, this is the latest message)
             unread_count = await db.message.count(
