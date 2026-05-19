@@ -1,9 +1,10 @@
 
-from fastapi import APIRouter, Depends, Query, Path, HTTPException,status
+from fastapi import APIRouter, Depends, Query, Path, HTTPException,status, UploadFile, File
 from typing import List, Optional
 from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse, ServiceCategoryListResponse, ProviderServicesResponse
+from app.modules.products.schemas import ImageUploadResponse
 from app.modules.services.service import (
-    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories, search_services
+    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories, search_services, upload_service_images
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -22,6 +23,16 @@ async def check_provider_role(user_id: int = Depends(get_current_user_id)):
             detail="Only service providers can perform this action"
         )
     return user_id
+
+@router.post("/upload-images", response_model=ImageUploadResponse)
+async def upload_images_endpoint(
+    images: list[UploadFile] = File(...),
+    provider_id: int = Depends(check_provider_role)
+):
+    """
+    Upload images and get their URLs.
+    """
+    return await upload_service_images(images)
 
 @router.post("/", response_model=ServiceResponse,status_code=status.HTTP_201_CREATED)
 async def create_service_endpoint(

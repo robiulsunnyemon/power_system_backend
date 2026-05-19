@@ -1,11 +1,27 @@
 from app.core.db import db
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from typing import List, Optional
+from app.common.cloudinary import upload_image
 from app.modules.services.schemas import ServiceCreate, ServiceUpdate
 from prisma.enums import ServiceStatus
 from prisma.types import ServiceUpdateInput
 from prisma import Json
 import json
+
+async def upload_service_images(files: List[UploadFile]):
+    """
+    Uploads multiple images to Cloudinary and returns their URLs.
+    """
+    if len(files) > 3:
+        raise HTTPException(status_code=400, detail="Maximum 3 images allowed")
+    
+    image_urls = []
+    for file in files:
+        upload_result = await upload_image(file, folder="jorden/services")
+        if upload_result:
+            image_urls.append(upload_result.get("secure_url"))
+            
+    return {"urls": image_urls}
 
 def format_service_response(service):
     """
