@@ -43,7 +43,7 @@ async def update_article(article_id: int, data: ArticleUpdate, image: UploadFile
         if article.image_url:
             public_id = get_public_id_from_url(article.image_url)
             if public_id:
-                await delete_image(public_id)
+                delete_image(public_id)
         
         # Upload new image
         upload_res = await upload_image(image, folder="jorden/articles")
@@ -59,12 +59,8 @@ async def delete_article(article_id: int):
     article = await db.articlesection.find_unique(where={"id": article_id})
     if not article:
         raise HTTPException(status_code=404, detail="Article not found")
-    
-    # Delete image from Cloudinary
-    if article.image_url:
-        public_id = get_public_id_from_url(article.image_url)
-        if public_id:
-            await delete_image(public_id)
+
+
             
     await db.articlesection.delete(where={"id": article_id})
     return {"message": "Article deleted successfully"}
