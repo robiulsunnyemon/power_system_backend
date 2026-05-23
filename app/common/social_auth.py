@@ -1,32 +1,42 @@
+import os
+import json
+import base64
 import httpx
 from jose import jwt, JWTError
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
+import firebase_admin
+from firebase_admin import credentials, auth
 from app.core.config import get_settings
 
 settings = get_settings()
 
-GOOGLE_CERTS_URL = "https://www.googleapis.com/oauth2/v3/certs"
 APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
+
+# Initialize Firebase Admin if not already initialized
+try:
+    firebase_admin.get_app()
+except ValueError:
+    try:
+        if settings.FIREBASE_CREDENTIALS_BASE64:
+            cred_dict = json.loads(base64.b64decode(settings.FIREBASE_CREDENTIALS_BASE64).decode('utf-8'))
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred)
+        elif settings.FIREBASE_CREDENTIALS_PATH and os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
+            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+            firebase_admin.initialize_app(cred)
+        elif os.path.exists("firebase_credentials.json"):
+            cred = credentials.Certificate("firebase_credentials.json")
+            firebase_admin.initialize_app(cred)
+        else:
+            firebase_admin.initialize_app()
+    except Exception as e:
+        print(f"Firebase initialization warning in social_auth: {e}")
 
 # Simple memory cache for public keys
 _keys_cache = {
-    "google": None,
     "apple": None
 }
-
-async def get_google_public_keys():
-    if _keys_cache["google"]:
-        return _keys_cache["google"]
-    async with httpx.AsyncClient() as client:
-        try:
-            response = await client.get(GOOGLE_CERTS_URL)
-            if response.status_code == 200:
-                keys = response.json().get("keys", [])
-                _keys_cache["google"] = keys
-                return keys
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to fetch Google public keys: {str(e)}")
-    raise HTTPException(status_code=500, detail="Failed to fetch Google public keys")
 
 async def get_apple_public_keys():
     if _keys_cache["apple"]:
@@ -44,39 +54,14 @@ async def get_apple_public_keys():
 
 async def verify_google_token(id_token: str) -> dict:
     try:
-        # 1. Unverified decode to inspect kid
-        header = jwt.get_unverified_header(id_token)
-        kid = header.get("kid")
-        if not kid:
-            raise HTTPException(status_code=400, detail="Invalid Google token header")
-        
-        # 2. Get Google public keys
-        keys = await get_google_public_keys()
-        
-        # 3. Find matching key
-        matching_key = next((k for k in keys if k["kid"] == kid), None)
-        if not matching_key:
-            # Clear cache and retry once
-            _keys_cache["google"] = None
-            keys = await get_google_public_keys()
-            matching_key = next((k for k in keys if k["kid"] == kid), None)
-            if not matching_key:
-                raise HTTPException(status_code=400, detail="Google public key not found")
-        
-        # 4. Verify token
-        payload = jwt.decode(
-            id_token,
-            matching_key,
-            algorithms=["RS256"],
-            options={"verify_aud": False}
-        )
-        
-        if payload.get("iss") not in ["accounts.google.com", "https://accounts.google.com"]:
-            raise HTTPException(status_code=400, detail="Invalid token issuer")
-            
+        # Verify the Firebase ID token using firebase_admin.auth
+        payload = await run_in_threadpool(auth.verify_id_token, id_token)
         return payload
-    except JWTError as e:
-        raise HTTPException(status_code=400, detail=f"Google token verification failed: {str(e)}")
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Firebase ID token verification failed: {str(e)}"
+        )
 
 async def verify_apple_token(identity_token: str) -> dict:
     try:

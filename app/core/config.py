@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str
     GOOGLE_CLOUD_PROJECT: Optional[str] = None
     
-    # FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_CREDENTIALS_BASE64: Optional[str] = None
 
     class Config:
