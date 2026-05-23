@@ -1,8 +1,8 @@
 from app.core.db import db
 from fastapi import UploadFile, HTTPException
 from typing import List, Optional
-from app.modules.products.schemas import ProductCreate
-from app.common.cloudinary import upload_image
+from app.modules.products.schemas import ProductCreate, ProductUpdateRequest
+from app.common.cloudinary import upload_image, delete_image, get_public_id_from_url
 from prisma.enums import ProductStatus, OrderStatus
 
 async def upload_product_images(files: List[UploadFile]):
@@ -173,14 +173,18 @@ async def get_seller_products(
 
 async def get_all_products(
     category_filter: str = "ALL", 
+    status_filter: str = "ACTIVE",
     product_id: Optional[int] = None,
     page: int = 1,
     page_size: int = 10
 ):
     """
-    Returns all ACTIVE products, optionally filtered by category, with pagination.
+    Returns products, optionally filtered by status, category, and product_id, with pagination.
+    Default status is ACTIVE.
     """
-    query = {"status": ProductStatus.ACTIVE}
+    query = {}
+    if status_filter != "ALL":
+        query["status"] = status_filter
     
     if category_filter != "ALL":
         query["category"] = {"name": category_filter.upper().strip()}
@@ -286,3 +290,75 @@ async def search_products(
         "page_size": page_size,
         "products": [format_product_response(p) for p in products]
     }
+
+async def update_product(seller_id: int, product_id: int, data: ProductUpdateRequest):
+    """
+    Updates a product's details and recalculates its total fee.
+    If a new image list is provided, deletes orphan images from Cloudinary.
+    """
+    # 1. Verify Product exists and seller owns it
+    product = await db.product.find_unique(
+        where={"id": product_id},
+        include={"category": True}
+    )
+    if not product or product.sellerId != seller_id:
+        raise HTTPException(
+            status_code=404, 
+            detail="Product not found or access denied"
+        )
+        
+    update_data = {}
+    
+    # 2. Category Handling
+    if data.category is not None:
+        category_name = data.category.upper().strip()
+        category = await db.category.upsert(
+            where={"name": category_name},
+            data={
+                "create": {"name": category_name},
+                "update": {}
+            }
+        )
+        update_data["categoryId"] = category.id
+        
+    # 3. Image Cleanups (Premium Storage Optimization)
+    if data.images is not None:
+        # Identify images that were deleted by the user
+        old_images = set(product.images)
+        new_images = set(data.images)
+        removed_images = old_images - new_images
+        
+        # Delete removed images from Cloudinary in the background/sync
+        for image_url in removed_images:
+            public_id = get_public_id_from_url(image_url)
+            if public_id:
+                delete_image(public_id)
+                
+        update_data["images"] = data.images
+        
+    # 4. Total Fee Recalculation
+    if (data.price is not None) or (data.tax_fee is not None) or (data.delivery_fee is not None):
+        price = data.price if data.price is not None else product.price
+        tax = data.tax_fee if data.tax_fee is not None else (product.tax_fee or 0)
+        delivery = data.delivery_fee if data.delivery_fee is not None else (product.delivery_fee or 0)
+        
+        update_data["price"] = price
+        update_data["tax_fee"] = tax
+        update_data["delivery_fee"] = delivery
+        update_data["total_fee"] = price + tax + delivery
+
+    # 5. Populate other fields if provided
+    fields = ["title", "description", "condition", "status", "longitude", "latitude"]
+    for field in fields:
+        val = getattr(data, field)
+        if val is not None:
+            update_data[field] = val
+            
+    # 6. Execute update in DB
+    updated_product = await db.product.update(
+        where={"id": product_id},
+        data=update_data,
+        include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}}
+    )
+    
+    return format_product_response(updated_product)

@@ -37,3 +37,9 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=6)
     confirm_password: str
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+
+class AppleLoginRequest(BaseModel):
+    identity_token: str

@@ -31,6 +31,13 @@ async def get_profile(user_id: int = Depends(get_current_user_id)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+@router.get("/profile/by_user_id/{user_id}", response_model=schemas.UserProfileResponse)
+async def get_profile(user_id: int):
+    user = await service.get_user_profile(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
+
 
 @router.get("/seller/me", response_model=schemas.SellerPublicProfileResponse)
 async def get_my_seller_profile(user_id: int = Depends(get_current_user_id)):

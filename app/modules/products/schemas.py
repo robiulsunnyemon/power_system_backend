@@ -85,3 +85,16 @@ class PaginatedProductResponse(BaseModel):
     page: int
     page_size: int
     products: List[ProductResponse]
+
+class ProductUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    tax_fee: Optional[float] = None
+    delivery_fee: Optional[float] = None
+    condition: Optional[ProductCondition] = None
+    status: Optional[ProductStatus] = None
+    category: Optional[str] = None
+    images: Optional[List[str]] = None
+    longitude: Optional[float] = None
+    latitude: Optional[float] = None

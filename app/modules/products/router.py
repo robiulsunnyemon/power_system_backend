@@ -56,13 +56,15 @@ async def get_my_products(
 async def list_products(
     product_id: Optional[int] = Query(None, description="Optional: Filter by a specific product ID"),
     category: str = "ALL",
+    status: schemas.ProductStatusFilter = Query(schemas.ProductStatusFilter.ACTIVE, description="Filter by status: ACTIVE, ALL, DRAFT, INACTIVE, DELETED, SOLDOUT"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100)
 ):
     """
-    Public endpoint to list all active products with category filtering and pagination.
+    Public endpoint to list products with category, status filtering and pagination.
+    Default status is ACTIVE.
     """
-    return await service.get_all_products(category, product_id, page, page_size)
+    return await service.get_all_products(category, status, product_id, page, page_size)
 
 @router.get("/products/search", response_model=schemas.PaginatedProductResponse)
 async def search_products_endpoint(
@@ -96,3 +98,14 @@ async def delete_product(
     - hard_delete=true: permanent removal
     """
     return await service.delete_product(seller_id, product_id, hard_delete)
+
+@router.patch("/products/{product_id}", response_model=schemas.ProductResponse)
+async def update_product(
+    product_id: int,
+    data: schemas.ProductUpdateRequest,
+    seller_id: int = Depends(check_seller_role)
+):
+    """
+    Endpoint for sellers to update their own product's details and images.
+    """
+    return await service.update_product(seller_id, product_id, data)

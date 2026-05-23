@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest, ForgetPasswordRequest, ResetPasswordRequest, ChangePasswordRequest
+from app.modules.auth.schemas import SignupRequest, LoginRequest, VerifyOTPRequest, ForgetPasswordRequest, ResetPasswordRequest, ChangePasswordRequest, GoogleLoginRequest, AppleLoginRequest
 from app.modules.auth import service
 from app.common.security import decode_token
 from app.core.db import db
@@ -62,3 +62,17 @@ async def reset_password(data: ResetPasswordRequest):
 @router.post("/change-password")
 async def change_password(data: ChangePasswordRequest, user_id: int = Depends(get_current_user_id)):
     return await service.change_password(user_id, data)
+
+@router.post("/google")
+async def google_login(data: GoogleLoginRequest):
+    """
+    Login or Signup with Google ID Token.
+    """
+    return await service.login_with_google(data)
+
+@router.post("/apple")
+async def apple_login(data: AppleLoginRequest):
+    """
+    Login or Signup with Apple Identity Token.
+    """
+    return await service.login_with_apple(data)
