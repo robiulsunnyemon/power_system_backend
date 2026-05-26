@@ -7,6 +7,9 @@ class SettingCreate(BaseModel):
     title: SettingType
     content: str
 
+class MaintenanceModeToggle(BaseModel):
+    is_maintenance: bool
+
 class SettingUpdate(BaseModel):
     #title: Optional[SettingType] = None
     content: Optional[str] = None

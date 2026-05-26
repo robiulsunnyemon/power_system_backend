@@ -96,6 +96,14 @@ async def login_user(data: LoginRequest):
     if user.accountStatus != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail=f"Account is {user.accountStatus}")
     
+    # Check maintenance mode
+    from app.modules.settings.service import is_maintenance_mode_active
+    if await is_maintenance_mode_active() and "ADMIN" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="System is in maintenance mode. Only admins are allowed to login."
+        )
+    
     last_active_role = user.lastActiveRole
     
     if data.role:
@@ -239,6 +247,14 @@ async def login_with_google(data: GoogleLoginRequest):
     if user.accountStatus != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail=f"Account is {user.accountStatus}")
         
+    # Check maintenance mode
+    from app.modules.settings.service import is_maintenance_mode_active
+    if await is_maintenance_mode_active() and "ADMIN" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="System is in maintenance mode. Only admins are allowed to login."
+        )
+        
     token = create_access_token(data={
         "sub": str(user.id), 
         "email": user.email, 
@@ -311,6 +327,14 @@ async def login_with_apple(data: AppleLoginRequest):
             
     if user.accountStatus != AccountStatus.ACTIVE:
         raise HTTPException(status_code=403, detail=f"Account is {user.accountStatus}")
+        
+    # Check maintenance mode
+    from app.modules.settings.service import is_maintenance_mode_active
+    if await is_maintenance_mode_active() and "ADMIN" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="System is in maintenance mode. Only admins are allowed to login."
+        )
         
     token = create_access_token(data={
         "sub": str(user.id), 

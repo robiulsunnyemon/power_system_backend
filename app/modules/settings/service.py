@@ -1,6 +1,6 @@
 from app.core.db import db
 from fastapi import HTTPException
-from app.modules.settings.schemas import SettingCreate, SettingUpdate
+from app.modules.settings.schemas import SettingCreate, SettingUpdate, MaintenanceModeToggle
 from prisma.enums import SettingType
 
 async def create_setting(data: SettingCreate):
@@ -70,3 +70,35 @@ async def delete_setting(setting_id: int):
         
     await db.setting.delete(where={"id": setting_id})
     return {"message": "Setting deleted successfully"}
+
+async def toggle_maintenance_mode(data: MaintenanceModeToggle):
+    """
+    Toggles the maintenance mode setting.
+    """
+    content_value = "true" if data.is_maintenance else "false"
+    
+    # Check if a setting with this title already exists
+    setting = await db.setting.find_unique(where={"title": SettingType.MAINTENANCE_MODE})
+    
+    if setting:
+        return await db.setting.update(
+            where={"id": setting.id},
+            data={"content": content_value}
+        )
+    else:
+        return await db.setting.create(
+            data={
+                "title": SettingType.MAINTENANCE_MODE,
+                "content": content_value
+            }
+        )
+
+async def is_maintenance_mode_active() -> bool:
+    """
+    Checks if maintenance mode is active.
+    """
+    try:
+        setting = await db.setting.find_unique(where={"title": SettingType.MAINTENANCE_MODE})
+        return setting is not None and setting.content == "true"
+    except Exception:
+        return False

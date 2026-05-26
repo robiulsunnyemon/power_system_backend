@@ -329,6 +329,7 @@ enum SettingType {
   TERMS_CONDITION
   ABOUT_US
   PRIVACY_POLICY
+  MAINTENANCE_MODE
 }
 
 model Setting {

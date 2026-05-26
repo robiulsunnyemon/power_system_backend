@@ -23,6 +23,14 @@ async def websocket_endpoint(websocket: WebSocket, token: str = None):
         await websocket.close(code=1008)
         return
 
+    # Check maintenance mode
+    from app.modules.settings.service import is_maintenance_mode_active
+    if await is_maintenance_mode_active():
+        roles = payload.get("roles", [])
+        if "ADMIN" not in roles:
+            await websocket.close(code=1008)
+            return
+
     user_id = int(payload.get("sub"))
     
     await manager.connect(user_id, websocket)

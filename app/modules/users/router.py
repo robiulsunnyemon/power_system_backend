@@ -23,6 +23,14 @@ async def get_current_user_id(credentials: HTTPAuthorizationCredentials = Depend
     if user.tokenVersion != token_version:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has been invalidated. Please login again.")
         
+    # Check maintenance mode
+    from app.modules.settings.service import is_maintenance_mode_active
+    if await is_maintenance_mode_active() and "ADMIN" not in user.roles:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="System is in maintenance mode. Only admins are allowed."
+        )
+        
     return user_id
 
 @router.get("/profile", response_model=schemas.UserProfileResponse)

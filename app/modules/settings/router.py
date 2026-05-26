@@ -36,6 +36,16 @@ async def get_setting(setting_id: int):
     """
     return await service.get_setting_by_id(setting_id)
 
+@router.put("/maintenance", response_model=schemas.SettingResponse)
+async def toggle_maintenance_mode(
+    data: schemas.MaintenanceModeToggle,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin only: Turn maintenance mode on or off.
+    """
+    return await service.toggle_maintenance_mode(data)
+
 @router.put("/{setting_id}", response_model=schemas.SettingResponse)
 async def update_setting(
     setting_id: int,
