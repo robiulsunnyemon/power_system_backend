@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from enum import Enum
 from datetime import datetime
-from prisma.enums import ProductCondition, ProductStatus
+from prisma.enums import ProductCondition, ProductStatus, ItemSize
 
 class ProductStatusFilter(str, Enum):
     ALL = "ALL"
@@ -37,6 +37,7 @@ class ProductCreate(BaseModel):
     images: List[str]  # List of Cloudinary URLs
     longitude: Optional[float] = None
     latitude: Optional[float] = None
+    itemSize: ItemSize = ItemSize.SMALL
 
 class ImageUploadResponse(BaseModel):
     urls: List[str]
@@ -52,6 +53,9 @@ class ProductResponse(BaseModel):
     total_fee: float
     condition: ProductCondition
     status: ProductStatus
+    isPriority: bool = False
+    priorityExpiresAt: Optional[datetime] = None
+    itemSize: ItemSize = ItemSize.SMALL
     longitude: Optional[float] = None
     latitude: Optional[float] = None
     createdAt: datetime

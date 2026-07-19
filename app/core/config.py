@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     
     FIREBASE_CREDENTIALS_PATH: Optional[str] = None
     FIREBASE_CREDENTIALS_BASE64: Optional[str] = None
+    
+    STRIPE_SECRET_KEY: Optional[str] = None
+    STRIPE_PUBLISHABLE_KEY: Optional[str] = None
+    STRIPE_WEBHOOK_SECRET: Optional[str] = None
 
     class Config:
         env_file = ".env"

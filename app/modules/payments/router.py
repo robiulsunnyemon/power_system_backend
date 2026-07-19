@@ -1,0 +1,243 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, Header
+import stripe
+import os
+from .schemas import CheckoutProductRequest, CheckoutServiceRequest, RefundRequest
+from .service import create_payment_intent, capture_escrow_intent, refund_payment
+from app.modules.users.router import get_current_user_id
+from app.core.pricing_engine import (
+    calculate_platform_fee,
+    calculate_protection_fee,
+    calculate_escrow_fee,
+    calculate_delivery_fee
+)
+from app.core.db import db
+from prisma.enums import PaymentMethod, PaymentStatus
+
+router = APIRouter(prefix="/payments", tags=["Payments"])
+
+@router.post("/checkout/product")
+async def checkout_product(req: CheckoutProductRequest, current_user_id: int = Depends(get_current_user_id)):
+    product = await db.product.find_unique(where={"id": req.product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+        
+    subtotal = product.price
+    platform_fee = calculate_platform_fee(subtotal, "PRODUCT")
+    protection_fee = calculate_protection_fee(subtotal) if req.has_protection else 0.0
+    escrow_fee = calculate_escrow_fee(subtotal) if req.is_escrow else 0.0
+    delivery_fee = calculate_delivery_fee(
+        size=product.itemSize.name, 
+        distance_km=req.distance_km, 
+        addons=req.delivery_addons
+    )
+    
+    total_amount = subtotal + platform_fee + protection_fee + escrow_fee + delivery_fee
+    
+    intent_id = None
+    client_secret = None
+    payment_status = PaymentStatus.PENDING
+    payment_method = PaymentMethod.STRIPE
+    
+    if req.is_cod:
+        # COD Flow
+        total_amount = subtotal # No fees for COD MVP
+        platform_fee = protection_fee = escrow_fee = 0.0
+        payment_method = PaymentMethod.COD
+    else:
+        # Stripe Flow
+        intent = await create_payment_intent(
+            amount=total_amount, 
+            is_escrow=req.is_escrow,
+            metadata={"product_id": req.product_id, "user_id": current_user_id}
+        )
+        intent_id = intent.id
+        client_secret = intent.client_secret
+        if req.is_escrow:
+            payment_status = PaymentStatus.HELD_IN_ESCROW
+            
+    # Create the order
+    order = await db.order.create(
+        data={
+            "userId": current_user_id,
+            "productId": req.product_id,
+            "subTotal": subtotal,
+            "platformFee": platform_fee,
+            "protectionFee": protection_fee,
+            "escrowFee": escrow_fee,
+            "deliveryFee": delivery_fee,
+            "totalAmount": total_amount,
+            "paymentMethod": payment_method,
+            "paymentStatus": payment_status,
+            "stripeIntentId": intent_id,
+            "distanceKm": req.distance_km,
+            "deliveryAddons": req.delivery_addons,
+            "hasProtection": req.has_protection,
+            "isEscrow": req.is_escrow,
+            "isCOD": req.is_cod
+        }
+    )
+    
+    return {
+        "order": order,
+        "client_secret": client_secret
+    }
+
+@router.post("/checkout/service")
+async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = Depends(get_current_user_id)):
+    service_app = await db.serviceapplication.find_unique(
+        where={"id": req.service_application_id},
+        include={"service": True}
+    )
+    if not service_app:
+        raise HTTPException(status_code=404, detail="Service application not found")
+        
+    if service_app.service.providerId != current_user_id:
+        raise HTTPException(status_code=403, detail="Only the job poster (Service Provider) can pay for this service.")
+        
+    subtotal = service_app.proposedRate
+    platform_fee = calculate_platform_fee(subtotal, "SERVICE")
+    protection_fee = calculate_protection_fee(subtotal) if req.has_protection else 0.0
+    escrow_fee = calculate_escrow_fee(subtotal) if req.is_escrow else 0.0
+    
+    total_amount = subtotal + platform_fee + protection_fee + escrow_fee
+    
+    intent_id = None
+    client_secret = None
+    payment_status = PaymentStatus.PENDING
+    payment_method = PaymentMethod.STRIPE
+    
+    if req.is_cod:
+        total_amount = subtotal # No fees for COD MVP
+        platform_fee = protection_fee = escrow_fee = 0.0
+        payment_method = PaymentMethod.COD
+    else:
+        intent = await create_payment_intent(
+            amount=total_amount, 
+            is_escrow=req.is_escrow,
+            metadata={"service_application_id": req.service_application_id, "user_id": current_user_id}
+        )
+        intent_id = intent.id
+        client_secret = intent.client_secret
+        if req.is_escrow:
+            payment_status = PaymentStatus.HELD_IN_ESCROW
+            
+    # Update the service application
+    updated_app = await db.serviceapplication.update(
+        where={"id": req.service_application_id},
+        data={
+            "subTotal": subtotal,
+            "platformFee": platform_fee,
+            "protectionFee": protection_fee,
+            "escrowFee": escrow_fee,
+            "totalAmount": total_amount,
+            "paymentMethod": payment_method,
+            "paymentStatus": payment_status,
+            "stripeIntentId": intent_id,
+            "hasProtection": req.has_protection,
+            "isEscrow": req.is_escrow,
+            "isCOD": req.is_cod
+        }
+    )
+    
+    return {
+        "service_application": updated_app,
+        "client_secret": client_secret
+    }
+
+@router.post("/escrow/{order_id}/release")
+async def release_escrow(order_id: int, current_user_id: int = Depends(get_current_user_id)):
+    order = await db.order.find_unique(where={"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    if order.paymentStatus != PaymentStatus.HELD_IN_ESCROW or not order.stripeIntentId:
+        raise HTTPException(status_code=400, detail="Order is not held in escrow")
+        
+    await capture_escrow_intent(order.stripeIntentId)
+    
+    updated = await db.order.update(
+        where={"id": order_id},
+        data={"paymentStatus": PaymentStatus.PAID}
+    )
+    return {"message": "Escrow released successfully", "order": updated}
+
+@router.post("/webhook")
+async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
+    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not webhook_secret:
+        raise HTTPException(status_code=400, detail="Webhook secret not configured")
+        
+    payload = await request.body()
+    
+    try:
+        event = stripe.Webhook.construct_event(
+            payload, stripe_signature, webhook_secret
+        )
+    except ValueError as e:
+        # Invalid payload
+        raise HTTPException(status_code=400, detail="Invalid payload")
+    except stripe.error.SignatureVerificationError as e:
+        # Invalid signature
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    event_type = event['type']
+    data_object = event['data']['object']
+    
+    if event_type == 'payment_intent.succeeded':
+        intent_id = data_object['id']
+        order = await db.order.find_first(where={"stripeIntentId": intent_id})
+        if order:
+            await db.order.update(
+                where={"id": order.id},
+                data={"paymentStatus": PaymentStatus.PAID}
+            )
+            # Log Transaction
+            await db.transaction.create(data={
+                "amount": float(data_object['amount_received']) / 100,
+                "currency": data_object['currency'],
+                "type": "PAYMENT",
+                "status": "COMPLETED",
+                "stripeChargeId": data_object.get("latest_charge"),
+                "userId": order.userId,
+                "orderId": order.id
+            })
+            
+    elif event_type == 'payment_intent.amount_capturable_updated':
+        # This means Escrow hold was successful
+        intent_id = data_object['id']
+        order = await db.order.find_first(where={"stripeIntentId": intent_id})
+        if order and order.isEscrow:
+            await db.order.update(
+                where={"id": order.id},
+                data={"paymentStatus": PaymentStatus.HELD_IN_ESCROW}
+            )
+            
+    elif event_type == 'charge.refunded':
+        intent_id = data_object['payment_intent']
+        order = await db.order.find_first(where={"stripeIntentId": intent_id})
+        if order:
+            await db.order.update(
+                where={"id": order.id},
+                data={"paymentStatus": PaymentStatus.REFUNDED}
+            )
+            # Log Refund Transaction
+            await db.transaction.create(data={
+                "amount": float(data_object['amount_refunded']) / 100,
+                "currency": data_object['currency'],
+                "type": "REFUND",
+                "status": "COMPLETED",
+                "stripeChargeId": data_object['id'],
+                "userId": order.userId,
+                "orderId": order.id
+            })
+            
+    elif event_type == 'charge.dispute.created':
+        intent_id = data_object['payment_intent']
+        order = await db.order.find_first(where={"stripeIntentId": intent_id})
+        if order:
+            await db.order.update(
+                where={"id": order.id},
+                data={"paymentStatus": PaymentStatus.FAILED} # Marking as failed for dispute
+            )
+
+    return {"status": "success"}

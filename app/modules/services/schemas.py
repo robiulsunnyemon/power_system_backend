@@ -46,6 +46,8 @@ class ServiceResponse(BaseModel):
     availability: Optional[Any] = None
     images: List[str]
     status: ServiceStatus
+    isPriority: bool = False
+    priorityExpiresAt: Optional[datetime] = None
     createdAt: datetime
     updatedAt: datetime
     providerId: int

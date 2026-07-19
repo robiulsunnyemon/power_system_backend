@@ -57,6 +57,9 @@ model User {
   serviceReviewsGiven     ServiceReview[] @relation("ClientServiceReviews")
   serviceReviewsReceived  ServiceReview[] @relation("ProviderServiceReviews")
   providerStats           ProviderStats?
+  
+  paymentMethods          SavedPaymentMethod[]
+  transactions            Transaction[]
 
   @@map("users")
 }
@@ -112,6 +115,36 @@ enum AccountStatus {
   DELETE
 }
 
+enum ItemSize {
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum PaymentMethod {
+  STRIPE
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  HELD_IN_ESCROW
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum TransactionType {
+  PAYMENT
+  REFUND
+  PAYOUT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
 
 model Category {
   id       Int       @id @default(autoincrement())
@@ -132,6 +165,11 @@ model Product {
   total_fee     Float            @default(0)
   condition     ProductCondition
   status        ProductStatus    @default(ACTIVE)
+  
+  isPriority    Boolean          @default(false)
+  priorityExpiresAt DateTime?
+  itemSize      ItemSize         @default(SMALL)
+  
   longitude     Float?
   latitude      Float?
   createdAt     DateTime         @default(now())
@@ -149,19 +187,44 @@ model Product {
 }
 
 model Order {
-  id        Int             @id @default(autoincrement())
-  status    OrderStatus     @default(PENDING)
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-
-  userId    Int
-  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  productId Int
-  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id               Int             @id @default(autoincrement())
+  status           OrderStatus     @default(PENDING)
   
-  tracking  OrderTracking[]
-  review    Review?
+  // Financials
+  subTotal         Float           @default(0)
+  platformFee      Float           @default(0)
+  protectionFee    Float           @default(0)
+  escrowFee        Float           @default(0)
+  deliveryFee      Float           @default(0)
+  deliveryAddonFee Float           @default(0)
+  totalAmount      Float           @default(0)
+  
+  // Payment Details
+  paymentMethod    PaymentMethod   @default(STRIPE)
+  paymentStatus    PaymentStatus   @default(PENDING)
+  stripeIntentId   String?
+  
+  // Delivery & Addons
+  distanceKm       Float?
+  deliveryAddons   String[]
+  
+  // Mechanics
+  hasProtection    Boolean         @default(false)
+  isEscrow         Boolean         @default(false)
+  isCOD            Boolean         @default(false)
+  
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  userId           Int
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId        Int
+  product          Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  tracking         OrderTracking[]
+  review           Review?
+  transactions     Transaction[]
 
   @@map("orders")
 }
@@ -259,6 +322,10 @@ model Service {
   availability  Json?         // e.g. ["M", "T", "W"]
   images        String[]
   status        ServiceStatus @default(DRAFT)
+  
+  isPriority    Boolean          @default(false)
+  priorityExpiresAt DateTime?
+  
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -286,6 +353,25 @@ model ServiceApplication {
 
   clientId          Int
   client            User                  @relation("ClientApplications", fields: [clientId], references: [id], onDelete: Cascade)
+
+  // Financials
+  subTotal         Float           @default(0)
+  platformFee      Float           @default(0)
+  protectionFee    Float           @default(0)
+  escrowFee        Float           @default(0)
+  totalAmount      Float           @default(0)
+  
+  // Payment Details
+  paymentMethod    PaymentMethod   @default(STRIPE)
+  paymentStatus    PaymentStatus   @default(PENDING)
+  stripeIntentId   String?
+  
+  // Mechanics
+  hasProtection    Boolean         @default(false)
+  isEscrow         Boolean         @default(false)
+  isCOD            Boolean         @default(false)
+  
+  transactions     Transaction[]
 
   tracking          ApplicationTracking[]
   review            ServiceReview?
@@ -490,3 +576,40 @@ model ProviderStats {
   @@map("provider_stats")
 }
 
+model SavedPaymentMethod {
+  id                    Int      @id @default(autoincrement())
+  stripeCustomerId      String
+  stripePaymentMethodId String
+  cardBrand             String?
+  last4                 String?
+  isDefault             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  
+  userId                Int
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("saved_payment_methods")
+}
+
+model Transaction {
+  id                   Int               @id @default(autoincrement())
+  amount               Float
+  currency             String            @default("USD")
+  type                 TransactionType
+  status               TransactionStatus @default(PENDING)
+  stripeChargeId       String?
+  
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  
+  userId               Int
+  user                 User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  orderId              Int?
+  order                Order?            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  serviceApplicationId Int?
+  serviceApplication   ServiceApplication? @relation(fields: [serviceApplicationId], references: [id], onDelete: Cascade)
+
+  @@map("transactions")
+}

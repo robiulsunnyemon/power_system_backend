@@ -1,7 +1,7 @@
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime
-from prisma.enums import OrderStatus
+from prisma.enums import OrderStatus, PaymentMethod, PaymentStatus
 from app.modules.products.schemas import ProductResponse
 from enum import Enum
 
@@ -32,6 +32,30 @@ class OrderTrackingResponse(BaseModel):
 class OrderResponse(BaseModel):
     id: int
     status: OrderStatus
+    
+    # Financials
+    subTotal: float = 0
+    platformFee: float = 0
+    protectionFee: float = 0
+    escrowFee: float = 0
+    deliveryFee: float = 0
+    deliveryAddonFee: float = 0
+    totalAmount: float = 0
+    
+    # Payment Details
+    paymentMethod: PaymentMethod = PaymentMethod.STRIPE
+    paymentStatus: PaymentStatus = PaymentStatus.PENDING
+    stripeIntentId: Optional[str] = None
+    
+    # Delivery & Addons
+    distanceKm: Optional[float] = None
+    deliveryAddons: List[str] = []
+    
+    # Mechanics
+    hasProtection: bool = False
+    isEscrow: bool = False
+    isCOD: bool = False
+
     createdAt: datetime
     updatedAt: datetime
     userId: int
