@@ -1,8 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 import stripe
 import os
-from .schemas import CheckoutProductRequest, CheckoutServiceRequest, RefundRequest
-from .service import create_payment_intent, capture_escrow_intent, refund_payment
+from .schemas import (
+    CheckoutProductRequest,
+    CheckoutServiceRequest,
+    RefundRequest,
+    CreateOnboardingLinkRequest,
+    StripeConnectStatusResponse,
+    OnboardingLinkResponse
+)
+from .service import (
+    create_payment_intent,
+    capture_escrow_intent,
+    refund_payment,
+    create_stripe_connect_account,
+    create_connect_onboarding_link,
+    retrieve_connect_account_status,
+    create_stripe_dashboard_login_link,
+    transfer_to_connected_account
+)
 from app.modules.users.router import get_current_user_id
 from app.core.pricing_engine import (
     calculate_platform_fee,
@@ -161,6 +177,76 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
     )
     return {"message": "Escrow released successfully", "order": updated}
 
+@router.post("/stripe-connect/onboarding-link", response_model=OnboardingLinkResponse)
+async def get_stripe_onboarding_link(req: CreateOnboardingLinkRequest, current_user_id: int = Depends(get_current_user_id)):
+    user = await db.user.find_unique(where={"id": current_user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    account_id = user.stripeAccountId
+    if not account_id:
+        connect_account = await create_stripe_connect_account(
+            user_id=user.id,
+            email=user.email
+        )
+        account_id = connect_account.id
+        await db.user.update(
+            where={"id": user.id},
+            data={
+                "stripeAccountId": account_id,
+                "stripeAccountStatus": "PENDING"
+            }
+        )
+        
+    onboarding_url = await create_connect_onboarding_link(
+        account_id=account_id,
+        refresh_url=req.refresh_url or "https://jordencuz.com/stripe/connect/refresh",
+        return_url=req.return_url or "https://jordencuz.com/stripe/connect/return"
+    )
+    
+    return {
+        "onboarding_url": onboarding_url,
+        "stripe_account_id": account_id
+    }
+
+@router.get("/stripe-connect/status", response_model=StripeConnectStatusResponse)
+async def check_stripe_connect_status(current_user_id: int = Depends(get_current_user_id)):
+    user = await db.user.find_unique(where={"id": current_user_id})
+    if not user or not user.stripeAccountId:
+        return {
+            "stripe_account_id": None,
+            "stripe_account_status": "NOT_CONNECTED",
+            "payouts_enabled": False,
+            "charges_enabled": False
+        }
+        
+    status_info = await retrieve_connect_account_status(user.stripeAccountId)
+    
+    await db.user.update(
+        where={"id": user.id},
+        data={
+            "stripeAccountStatus": status_info["status"],
+            "payoutsEnabled": status_info["payouts_enabled"],
+            "chargesEnabled": status_info["charges_enabled"]
+        }
+    )
+    
+    return {
+        "stripe_account_id": user.stripeAccountId,
+        "stripe_account_status": status_info["status"],
+        "payouts_enabled": status_info["payouts_enabled"],
+        "charges_enabled": status_info["charges_enabled"]
+    }
+
+@router.post("/stripe-connect/login-link")
+async def get_stripe_login_link(current_user_id: int = Depends(get_current_user_id)):
+    user = await db.user.find_unique(where={"id": current_user_id})
+    if not user or not user.stripeAccountId:
+        raise HTTPException(status_code=400, detail="No connected Stripe account found for this user")
+        
+    login_url = await create_stripe_dashboard_login_link(user.stripeAccountId)
+    return {"login_url": login_url}
+
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -240,4 +326,28 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 data={"paymentStatus": PaymentStatus.FAILED} # Marking as failed for dispute
             )
 
+    elif event_type == 'account.updated':
+        account_id = data_object.get('id')
+        payouts_enabled = data_object.get('payouts_enabled', False)
+        charges_enabled = data_object.get('charges_enabled', False)
+        details_submitted = data_object.get('details_submitted', False)
+        
+        status = "PENDING"
+        if payouts_enabled and charges_enabled:
+            status = "CONNECTED"
+        elif details_submitted:
+            status = "VERIFYING"
+            
+        user = await db.user.find_first(where={"stripeAccountId": account_id})
+        if user:
+            await db.user.update(
+                where={"id": user.id},
+                data={
+                    "stripeAccountStatus": status,
+                    "payoutsEnabled": payouts_enabled,
+                    "chargesEnabled": charges_enabled
+                }
+            )
+
     return {"status": "success"}
+

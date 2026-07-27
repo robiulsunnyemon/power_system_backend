@@ -19,3 +19,18 @@ class RefundRequest(BaseModel):
     order_id: int
     amount: Optional[float] = None # full refund if none
     reason: Optional[str] = None
+
+class CreateOnboardingLinkRequest(BaseModel):
+    refresh_url: Optional[str] = "https://jordencuz.com/stripe/connect/refresh"
+    return_url: Optional[str] = "https://jordencuz.com/stripe/connect/return"
+
+class StripeConnectStatusResponse(BaseModel):
+    stripe_account_id: Optional[str] = None
+    stripe_account_status: str
+    payouts_enabled: bool
+    charges_enabled: bool
+
+class OnboardingLinkResponse(BaseModel):
+    onboarding_url: str
+    stripe_account_id: str
+
