@@ -174,8 +174,8 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    if order.status == "COMPLETED":
-        return {"message": "Order is already completed", "order": order}
+    if order.paymentStatus == PaymentStatus.PAID:
+        return {"message": "Order payment has already been released", "order": order}
         
     if order.paymentStatus == PaymentStatus.HELD_IN_ESCROW and order.stripeIntentId:
         await capture_escrow_intent(order.stripeIntentId)
@@ -197,7 +197,7 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
         where={"id": order_id},
         data={
             "paymentStatus": PaymentStatus.PAID,
-            "status": "COMPLETED",
+            "status": OrderStatus.DELIVERED,
             "tracking": {
                 "create": [{"status": "ORDER COMPLETED & ESCROW RELEASED"}]
             }
