@@ -194,7 +194,13 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
 
     updated = await db.order.update(
         where={"id": order_id},
-        data={"paymentStatus": PaymentStatus.PAID}
+        data={
+            "paymentStatus": PaymentStatus.PAID,
+            "status": "COMPLETED",
+            "tracking": {
+                "create": [{"status": "ORDER COMPLETED & ESCROW RELEASED"}]
+            }
+        }
     )
     return {"message": "Escrow released successfully and payout processed", "order": updated}
 
