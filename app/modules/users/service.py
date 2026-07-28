@@ -123,6 +123,7 @@ async def get_user_profile(user_id: int):
     user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
     user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
     user_dict["is_online"] = manager.is_user_online(user_id)
+    user_dict["is_stripe_active"] = bool(user.payoutsEnabled and user.chargesEnabled)
     return user_dict
 
 async def update_user_profile(user_id: int, data: UpdateProfileRequest):
@@ -138,6 +139,7 @@ async def update_user_profile(user_id: int, data: UpdateProfileRequest):
     user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
     user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
     user_dict["is_online"] = manager.is_user_online(user_id)
+    user_dict["is_stripe_active"] = bool(user.payoutsEnabled and user.chargesEnabled)
     return user_dict
 
 async def update_profile_image(user_id: int, file: UploadFile):

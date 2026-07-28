@@ -32,6 +32,7 @@ async def get_all_users(role_filter: UserRoleFilter, page: int = 1, page_size: i
         user_dict["trust_score"] = user.profile.trust_score if user.profile else 0
         user_dict["raw_score"] = user.profile.raw_score if user.profile else 0
         user_dict["is_online"] = manager.is_user_online(user.id)
+        user_dict["is_stripe_active"] = bool(user.payoutsEnabled and user.chargesEnabled)
         result.append(user_dict)
     
     return {
@@ -59,7 +60,8 @@ async def update_user_status(user_id: int, status):
     user_dict["profile_image"] = updated_user.profile.profile_image if updated_user.profile else None
     user_dict["trust_score"] = updated_user.profile.trust_score if updated_user.profile else 0
     user_dict["raw_score"] = updated_user.profile.raw_score if updated_user.profile else 0
-    user_dict["is_online"] = manager.is_user_online(user_id)
+    user_dict["is_online"] = manager.is_user_online(user.id)
+    user_dict["is_stripe_active"] = bool(updated_user.payoutsEnabled and updated_user.chargesEnabled)
     return user_dict
 
 def calculate_growth_pct(current: int, previous: int) -> float:

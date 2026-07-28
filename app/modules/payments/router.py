@@ -162,7 +162,10 @@ async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = D
 
 @router.post("/escrow/{order_id}/release")
 async def release_escrow(order_id: int, current_user_id: int = Depends(get_current_user_id)):
-    order = await db.order.find_unique(where={"id": order_id})
+    order = await db.order.find_unique(
+        where={"id": order_id},
+        include={"product": {"include": {"seller": True}}}
+    )
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
@@ -171,11 +174,57 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
         
     await capture_escrow_intent(order.stripeIntentId)
     
+    # Auto-payout net earnings to seller if Connect account is active
+    seller = order.product.seller if (order.product and order.product.seller) else None
+    if seller and seller.stripeAccountId and seller.payoutsEnabled:
+        payout_amount = order.subTotal
+        try:
+            await transfer_to_connected_account(
+                amount=payout_amount,
+                destination_account_id=seller.stripeAccountId,
+                transfer_group=f"ORDER_{order.id}"
+            )
+        except Exception as e:
+            print(f"Warning: Auto payout to seller Stripe Connect account failed: {e}")
+
     updated = await db.order.update(
         where={"id": order_id},
         data={"paymentStatus": PaymentStatus.PAID}
     )
-    return {"message": "Escrow released successfully", "order": updated}
+    return {"message": "Escrow released successfully and payout processed", "order": updated}
+
+@router.post("/service-escrow/{service_application_id}/release")
+async def release_service_escrow(service_application_id: int, current_user_id: int = Depends(get_current_user_id)):
+    service_app = await db.serviceapplication.find_unique(
+        where={"id": service_application_id},
+        include={"client": True, "service": True}
+    )
+    if not service_app:
+        raise HTTPException(status_code=404, detail="Service application not found")
+        
+    if service_app.paymentStatus != PaymentStatus.HELD_IN_ESCROW or not service_app.stripeIntentId:
+        raise HTTPException(status_code=400, detail="Service application payment is not held in escrow")
+        
+    await capture_escrow_intent(service_app.stripeIntentId)
+    
+    # Auto-payout net earnings to applicant (client) if Connect account is active
+    applicant = service_app.client
+    if applicant and applicant.stripeAccountId and applicant.payoutsEnabled:
+        payout_amount = service_app.subTotal
+        try:
+            await transfer_to_connected_account(
+                amount=payout_amount,
+                destination_account_id=applicant.stripeAccountId,
+                transfer_group=f"SERVICE_APP_{service_app.id}"
+            )
+        except Exception as e:
+            print(f"Warning: Auto payout to applicant Stripe Connect account failed: {e}")
+
+    updated = await db.serviceapplication.update(
+        where={"id": service_application_id},
+        data={"paymentStatus": PaymentStatus.PAID, "status": "COMPLETED"}
+    )
+    return {"message": "Service escrow released successfully and payout processed", "service_application": updated}
 
 @router.post("/stripe-connect/onboarding-link", response_model=OnboardingLinkResponse)
 async def get_stripe_onboarding_link(req: CreateOnboardingLinkRequest, current_user_id: int = Depends(get_current_user_id)):

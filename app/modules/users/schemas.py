@@ -37,6 +37,11 @@ class UserProfileResponse(BaseModel):
     trust_score: float = 0.0
     raw_score: float = 0.0
     is_online: bool = False
+    stripeAccountId: Optional[str] = None
+    stripeAccountStatus: Optional[str] = "PENDING"
+    payoutsEnabled: bool = False
+    chargesEnabled: bool = False
+    is_stripe_active: bool = False
     createdAt: datetime
     updatedAt: datetime
 
