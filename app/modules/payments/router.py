@@ -174,10 +174,11 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
-    if order.paymentStatus != PaymentStatus.HELD_IN_ESCROW or not order.stripeIntentId:
-        raise HTTPException(status_code=400, detail="Order is not held in escrow")
+    if order.status == "COMPLETED":
+        return {"message": "Order is already completed", "order": order}
         
-    await capture_escrow_intent(order.stripeIntentId)
+    if order.paymentStatus == PaymentStatus.HELD_IN_ESCROW and order.stripeIntentId:
+        await capture_escrow_intent(order.stripeIntentId)
     
     # Auto-payout net earnings to seller if Connect account is active
     seller = order.product.seller if (order.product and order.product.seller) else None
