@@ -3,10 +3,17 @@ import os
 from fastapi import HTTPException
 from app.core.db import db
 from prisma.enums import PaymentStatus
+from app.core.config import get_settings
 
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+def get_stripe_api_key():
+    key = os.getenv("STRIPE_SECRET_KEY") or get_settings().STRIPE_SECRET_KEY
+    if not key:
+        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured in environment variables.")
+    stripe.api_key = key
+    return key
 
 async def create_payment_intent(amount: float, currency: str = "usd", is_escrow: bool = False, metadata: dict = None):
+    get_stripe_api_key()
     try:
         amount_cents = int(amount * 100)
         

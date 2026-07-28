@@ -41,10 +41,15 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
     platform_fee = calculate_platform_fee(subtotal, "PRODUCT")
     protection_fee = calculate_protection_fee(subtotal) if req.has_protection else 0.0
     escrow_fee = calculate_escrow_fee(subtotal) if req.is_escrow else 0.0
+    
+    item_size_str = "SMALL"
+    if product.itemSize:
+        item_size_str = getattr(product.itemSize, "name", str(product.itemSize))
+
     delivery_fee = calculate_delivery_fee(
-        size=product.itemSize.name, 
-        distance_km=req.distance_km, 
-        addons=req.delivery_addons
+        size=item_size_str, 
+        distance_km=req.distance_km or 0.0, 
+        addons=req.delivery_addons or []
     )
     
     total_amount = subtotal + platform_fee + protection_fee + escrow_fee + delivery_fee
