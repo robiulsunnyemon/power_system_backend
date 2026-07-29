@@ -259,7 +259,7 @@ async def get_seller_dashboard_stats(seller_id: int):
         },
         include={"product": True}
     )
-    total_revenue = sum(o.product.total_fee for o in delivered_orders)
+    total_revenue = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in delivered_orders)
 
     # --- 2. Operational Counts ---
     total_active_products = await db.product.count(
@@ -288,11 +288,11 @@ async def get_seller_dashboard_stats(seller_id: int):
 
     # Revenue this month
     this_month_orders = [o for o in delivered_orders if o.createdAt >= first_day_this_month]
-    revenue_this_month = sum(o.product.total_fee for o in this_month_orders)
+    revenue_this_month = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in this_month_orders)
 
     # Revenue last month
     last_month_orders = [o for o in delivered_orders if first_day_last_month <= o.createdAt <= last_day_last_month]
-    revenue_last_month = sum(o.product.total_fee for o in last_month_orders)
+    revenue_last_month = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in last_month_orders)
 
     # Calculate growth %
     if revenue_last_month == 0:
@@ -327,7 +327,7 @@ async def get_seller_revenue_growth(seller_id: int, filter_type: schemas.GrowthF
                 },
                 include={"product": True}
             )
-            revenue = sum(o.product.total_fee for o in orders)
+            revenue = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in orders)
             data_points.append({"label": day.strftime("%a"), "revenue": revenue})
 
     elif filter_type == schemas.GrowthFilter.MONTHLY:
@@ -343,7 +343,7 @@ async def get_seller_revenue_growth(seller_id: int, filter_type: schemas.GrowthF
                 },
                 include={"product": True}
             )
-            revenue = sum(o.product.total_fee for o in orders)
+            revenue = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in orders)
             data_points.append({"label": day.strftime("%d %b"), "revenue": revenue})
 
     elif filter_type in [schemas.GrowthFilter.SIX_MONTHS, schemas.GrowthFilter.YEARLY]:
@@ -369,7 +369,7 @@ async def get_seller_revenue_growth(seller_id: int, filter_type: schemas.GrowthF
                 },
                 include={"product": True}
             )
-            revenue = sum(o.product.total_fee for o in orders)
+            revenue = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in orders)
             data_points.append({"label": month_start.strftime("%b %y"), "revenue": revenue})
 
     elif filter_type == schemas.GrowthFilter.YEAR_RANGE:
@@ -384,7 +384,7 @@ async def get_seller_revenue_growth(seller_id: int, filter_type: schemas.GrowthF
                 },
                 include={"product": True}
             )
-            revenue = sum(o.product.total_fee for o in orders)
+            revenue = sum((o.subTotal if o.subTotal > 0 else (o.product.price if o.product else 0.0)) for o in orders)
             data_points.append({"label": str(year_start.year), "revenue": revenue})
 
     return {"data": data_points}

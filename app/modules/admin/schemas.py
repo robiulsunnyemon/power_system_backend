@@ -28,6 +28,9 @@ class DashboardStatsResponse(BaseModel):
     total_growth_pct: float
     active_growth_pct: float
     pending_growth_pct: float
+    total_platform_revenue: float = 0.0
+    total_transaction_volume: float = 0.0
+    active_stripe_users: int = 0
 
 class GrowthDataPoint(BaseModel):
     label: str # e.g. "Mon", "May", "2024"

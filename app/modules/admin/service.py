@@ -93,8 +93,13 @@ async def get_dashboard_stats():
     active_new_this_month = await db.user.count(where={"accountStatus": AccountStatus.ACTIVE, "createdAt": {"gte": first_day_this_month}})
     active_new_last_month = await db.user.count(where={"accountStatus": AccountStatus.ACTIVE, "createdAt": {"gte": first_day_last_month, "lte": last_day_last_month}})
 
-    pending_new_this_month = await db.user.count(where={"accountStatus": AccountStatus.PENDING, "createdAt": {"gte": first_day_this_month}})
-    pending_new_last_month = await db.user.count(where={"accountStatus": AccountStatus.PENDING, "createdAt": {"gte": first_day_last_month, "lte": last_day_last_month}})
+    # Financial Stats (Product Orders + Service Applications)
+    paid_orders = await db.order.find_many(where={"paymentStatus": "PAID"})
+    paid_services = await db.serviceapplication.find_many(where={"paymentStatus": "PAID"})
+    
+    total_platform_revenue = sum(o.platformFee + o.protectionFee + o.escrowFee for o in paid_orders) + sum(s.platformFee + s.protectionFee + s.escrowFee for s in paid_services)
+    total_transaction_volume = sum(o.totalAmount for o in paid_orders) + sum(s.totalAmount for s in paid_services)
+    active_stripe_users = await db.user.count(where={"payoutsEnabled": True, "chargesEnabled": True})
 
     return {
         "total_users": total_users,
@@ -102,7 +107,10 @@ async def get_dashboard_stats():
         "pending_users": pending_users,
         "total_growth_pct": calculate_growth_pct(new_this_month, new_last_month),
         "active_growth_pct": calculate_growth_pct(active_new_this_month, active_new_last_month),
-        "pending_growth_pct": calculate_growth_pct(pending_new_this_month, pending_new_last_month)
+        "pending_growth_pct": calculate_growth_pct(pending_new_this_month, pending_new_last_month),
+        "total_platform_revenue": total_platform_revenue,
+        "total_transaction_volume": total_transaction_volume,
+        "active_stripe_users": active_stripe_users
     }
 
 async def get_user_growth(filter_type: GrowthFilter):

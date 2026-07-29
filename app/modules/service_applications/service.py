@@ -222,6 +222,11 @@ async def update_application_status(provider_id: int, application_id: int, data:
 
     return format_application_response(updated_app)
 
+from prisma.enums import ApplicationStatus
+
+def _get_app_amount(app):
+    return app.subTotal if app.subTotal and app.subTotal > 0 else app.proposedRate
+
 async def get_provider_earnings(provider_id: int):
     """
     Returns earnings statistics and history for a service provider.
@@ -237,11 +242,11 @@ async def get_provider_earnings(provider_id: int):
         order={"updatedAt": "desc"}
     )
 
-    total_completed_jobs = sum(1 for a in applications if str(a.status).endswith("COMPLETED"))
-    total_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("COMPLETED"))
+    total_completed_jobs = sum(1 for a in applications if a.status == ApplicationStatus.COMPLETED)
+    total_earnings = sum(_get_app_amount(a) for a in applications if a.status == ApplicationStatus.COMPLETED)
     
     # Pending earnings are from ACCEPTED but not yet COMPLETED applications
-    pending_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("ACCEPTED"))
+    pending_earnings = sum(_get_app_amount(a) for a in applications if a.status == ApplicationStatus.ACCEPTED)
 
     # Time-based quick stats (based on updatedAt for completed status)
     start_of_week = now - timedelta(days=now.weekday())
@@ -250,12 +255,12 @@ async def get_provider_earnings(provider_id: int):
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     earnings_this_week = sum(
-        a.proposedRate for a in applications 
-        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_week
+        _get_app_amount(a) for a in applications 
+        if a.status == ApplicationStatus.COMPLETED and a.updatedAt >= start_of_week
     )
     earnings_this_month = sum(
-        a.proposedRate for a in applications 
-        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_month
+        _get_app_amount(a) for a in applications 
+        if a.status == ApplicationStatus.COMPLETED and a.updatedAt >= start_of_month
     )
 
     # History (Recent 15 items)
@@ -264,7 +269,7 @@ async def get_provider_earnings(provider_id: int):
         history.append({
             "id": a.id,
             "title": a.service.title,
-            "amount": a.proposedRate,
+            "amount": _get_app_amount(a),
             "status": a.status,
             "date": a.updatedAt,
             "images": a.service.images
@@ -284,7 +289,7 @@ async def get_provider_earnings(provider_id: int):
 
 async def get_user_earnings(user_id: int):
     """
-    Returns earnings statistics and history for a service provider.
+    Returns earnings statistics and history for a service provider/worker client.
     """
     now = datetime.now(timezone.utc)
 
@@ -297,11 +302,11 @@ async def get_user_earnings(user_id: int):
         order={"updatedAt": "desc"}
     )
 
-    total_completed_jobs = sum(1 for a in applications if str(a.status).endswith("COMPLETED"))
-    total_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("COMPLETED"))
+    total_completed_jobs = sum(1 for a in applications if a.status == ApplicationStatus.COMPLETED)
+    total_earnings = sum(_get_app_amount(a) for a in applications if a.status == ApplicationStatus.COMPLETED)
 
     # Pending earnings are from ACCEPTED but not yet COMPLETED applications
-    pending_earnings = sum(a.proposedRate for a in applications if str(a.status).endswith("ACCEPTED"))
+    pending_earnings = sum(_get_app_amount(a) for a in applications if a.status == ApplicationStatus.ACCEPTED)
 
     # Time-based quick stats (based on updatedAt for completed status)
     start_of_week = now - timedelta(days=now.weekday())
@@ -310,12 +315,12 @@ async def get_user_earnings(user_id: int):
     start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
     earnings_this_week = sum(
-        a.proposedRate for a in applications
-        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_week
+        _get_app_amount(a) for a in applications
+        if a.status == ApplicationStatus.COMPLETED and a.updatedAt >= start_of_week
     )
     earnings_this_month = sum(
-        a.proposedRate for a in applications
-        if str(a.status).endswith("COMPLETED") and a.updatedAt >= start_of_month
+        _get_app_amount(a) for a in applications
+        if a.status == ApplicationStatus.COMPLETED and a.updatedAt >= start_of_month
     )
 
     # History (Recent 15 items)
@@ -324,7 +329,7 @@ async def get_user_earnings(user_id: int):
         history.append({
             "id": a.id,
             "title": a.service.title,
-            "amount": a.proposedRate,
+            "amount": _get_app_amount(a),
             "status": a.status,
             "date": a.updatedAt,
             "images": a.service.images

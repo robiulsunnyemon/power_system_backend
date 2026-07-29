@@ -409,6 +409,40 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     "chargesEnabled": charges_enabled
                 }
             )
+            
+            # Retroactive Payout: If account just became active, process pending payouts for this user!
+            if payouts_enabled and charges_enabled:
+                pending_orders = await db.order.find_many(
+                    where={
+                        "product": {"sellerId": user.id},
+                        "paymentStatus": PaymentStatus.PAID
+                    }
+                )
+                for pending_order in pending_orders:
+                    try:
+                        await transfer_to_connected_account(
+                            amount=pending_order.subTotal,
+                            destination_account_id=account_id,
+                            transfer_group=f"ORDER_{pending_order.id}"
+                        )
+                    except Exception as ex:
+                        print(f"Retroactive payout failed for order {pending_order.id}: {ex}")
+
+                pending_services = await db.serviceapplication.find_many(
+                    where={
+                        "clientId": user.id,
+                        "paymentStatus": PaymentStatus.PAID
+                    }
+                )
+                for pending_svc in pending_services:
+                    try:
+                        await transfer_to_connected_account(
+                            amount=pending_svc.subTotal,
+                            destination_account_id=account_id,
+                            transfer_group=f"SERVICE_{pending_svc.id}"
+                        )
+                    except Exception as ex:
+                        print(f"Retroactive payout failed for service app {pending_svc.id}: {ex}")
 
     return {"status": "success"}
 
