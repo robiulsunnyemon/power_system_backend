@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 import stripe
 import os
+from datetime import datetime, timedelta, timezone
 from .schemas import (
     CheckoutProductRequest,
     CheckoutServiceRequest,
     RefundRequest,
     CreateOnboardingLinkRequest,
     StripeConnectStatusResponse,
-    OnboardingLinkResponse
+    OnboardingLinkResponse,
+    PriorityBoostProductRequest,
+    PriorityBoostServiceRequest,
+    PriorityBoostUrgentJobRequest
 )
 from .service import (
     create_payment_intent,
@@ -24,7 +28,11 @@ from app.core.pricing_engine import (
     calculate_platform_fee,
     calculate_protection_fee,
     calculate_escrow_fee,
-    calculate_delivery_fee
+    calculate_delivery_fee,
+    PRODUCT_PRIORITY_FEE,
+    SERVICE_PRIORITY_FEE,
+    URGENT_JOB_PRIORITY_FEE,
+    PRIORITY_DURATION_HOURS
 )
 from app.core.db import db
 from prisma.enums import PaymentMethod, PaymentStatus
@@ -307,6 +315,169 @@ async def get_stripe_login_link(current_user_id: int = Depends(get_current_user_
         
     login_url = await create_stripe_dashboard_login_link(user.stripeAccountId)
     return {"login_url": login_url}
+
+@router.post("/priority/product")
+async def priority_boost_product(req: PriorityBoostProductRequest, current_user_id: int = Depends(get_current_user_id)):
+    product = await db.product.find_unique(where={"id": req.product_id})
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if product.sellerId != current_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to boost this product")
+
+    fee_amount = PRODUCT_PRIORITY_FEE
+    intent = await create_payment_intent(
+        amount=fee_amount,
+        currency="usd",
+        metadata={
+            "type": "PRODUCT_PRIORITY_BOOST",
+            "product_id": product.id,
+            "seller_id": current_user_id
+        }
+    )
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    updated_product = await db.product.update(
+        where={"id": product.id},
+        data={
+            "isPriority": True,
+            "priorityExpiresAt": expires_at
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": f"Product boosted to Priority for {PRIORITY_DURATION_HOURS} hours",
+        "fee_charged": fee_amount,
+        "isPriority": True,
+        "priorityExpiresAt": expires_at.isoformat(),
+        "client_secret": intent.get("client_secret")
+    }
+
+@router.post("/priority/service")
+async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_id: int = Depends(get_current_user_id)):
+    service = await db.service.find_unique(where={"id": req.service_id})
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    if service.providerId != current_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to boost this service")
+
+    fee_amount = SERVICE_PRIORITY_FEE
+    intent = await create_payment_intent(
+        amount=fee_amount,
+        currency="usd",
+        metadata={
+            "type": "SERVICE_PRIORITY_BOOST",
+            "service_id": service.id,
+            "provider_id": current_user_id
+        }
+    )
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    updated_service = await db.service.update(
+        where={"id": service.id},
+        data={
+            "isPriority": True,
+            "priorityExpiresAt": expires_at
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": f"Service boosted to Priority for {PRIORITY_DURATION_HOURS} hours",
+        "fee_charged": fee_amount,
+        "isPriority": True,
+        "priorityExpiresAt": expires_at.isoformat(),
+        "client_secret": intent.get("client_secret")
+    }
+
+@router.post("/priority/urgent-job")
+async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_user_id: int = Depends(get_current_user_id)):
+    service_app = await db.serviceapplication.find_unique(where={"id": req.service_application_id})
+    if not service_app:
+        raise HTTPException(status_code=404, detail="Service application not found")
+    if service_app.clientId != current_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to boost this application")
+
+    fee_amount = URGENT_JOB_PRIORITY_FEE
+    intent = await create_payment_intent(
+        amount=fee_amount,
+        currency="usd",
+        metadata={
+            "type": "URGENT_JOB_PRIORITY_BOOST",
+            "service_application_id": service_app.id,
+            "client_id": current_user_id
+        }
+    )
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    await db.serviceapplication.update(
+        where={"id": service_app.id},
+        data={
+            "isEscrow": True
+        }
+    )
+    if service_app.serviceId:
+        await db.service.update(
+            where={"id": service_app.serviceId},
+            data={
+                "isPriority": True,
+                "priorityExpiresAt": expires_at
+            }
+        )
+
+    return {
+        "status": "success",
+        "message": f"Job boosted to Urgent Priority ($10) for {PRIORITY_DURATION_HOURS} hours",
+        "fee_charged": fee_amount,
+        "isPriority": True,
+        "priorityExpiresAt": expires_at.isoformat(),
+        "client_secret": intent.get("client_secret")
+    }
+
+@router.post("/refund")
+async def process_refund(req: RefundRequest, current_user_id: int = Depends(get_current_user_id)):
+    """
+    Enforces Platform Refund Policy:
+    - Fully Refundable: Duplicate payments, failed transactions, item not received, provider no-show, approved disputes.
+    - Partially Refundable: Partial service completion, agreed settlements.
+    - Non-Refundable: Change of mind, failure to inspect, completed services & deliveries, consumed priority fees.
+    """
+    order = await db.order.find_unique(where={"id": req.order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Non-Refundable Enforcer: Completed deliveries/services are non-refundable
+    if order.status == OrderStatus.DELIVERED and order.paymentStatus == PaymentStatus.PAID:
+        raise HTTPException(
+            status_code=400, 
+            detail="Completed deliveries and services are non-refundable according to platform policy."
+        )
+
+    if not order.stripeIntentId:
+        raise HTTPException(status_code=400, detail="Order has no associated Stripe Payment Intent")
+
+    try:
+        refund_res = await refund_payment(order.stripeIntentId, req.amount)
+        await db.order.update(
+            where={"id": order.id},
+            data={"paymentStatus": PaymentStatus.REFUNDED}
+        )
+        await db.transaction.create(data={
+            "amount": req.amount if req.amount else order.totalAmount,
+            "currency": "usd",
+            "type": "REFUND",
+            "status": "COMPLETED",
+            "stripeChargeId": str(refund_res.get("id", "")),
+            "userId": current_user_id,
+            "orderId": order.id
+        })
+        return {
+            "status": "success",
+            "message": "Refund processed successfully according to platform policy",
+            "refund": refund_res
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Refund failed: {str(e)}")
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):

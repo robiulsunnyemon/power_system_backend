@@ -1,6 +1,12 @@
 import math
 from typing import List
 
+# Priority Fees & Duration (24 Hours)
+PRODUCT_PRIORITY_FEE = 5.0
+SERVICE_PRIORITY_FEE = 5.0
+URGENT_JOB_PRIORITY_FEE = 10.0
+PRIORITY_DURATION_HOURS = 24
+
 # Pricing rules as defined in the plan
 
 def calculate_platform_fee(amount: float, item_type: str) -> float:

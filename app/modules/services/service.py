@@ -161,10 +161,22 @@ async def get_all_services(
     # Calculate skip
     skip = (page - 1) * page_size
     
+    # Auto-expire priority services whose 24-hour boost has elapsed
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    expired_services = await db.service.find_many(
+        where={
+            "isPriority": True,
+            "priorityExpiresAt": {"lte": now}
+        }
+    )
+    for es in expired_services:
+        await db.service.update(where={"id": es.id}, data={"isPriority": False})
+
     services = await db.service.find_many(
         where=query,
         include={"provider": {"include": {"profile": True}}},
-        order={"createdAt": "desc"},
+        order=[{"isPriority": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )

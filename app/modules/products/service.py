@@ -198,10 +198,22 @@ async def get_all_products(
     # Calculate skip
     skip = (page - 1) * page_size
     
+    # Auto-expire priority products whose 24-hour boost has elapsed
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    expired_products = await db.product.find_many(
+        where={
+            "isPriority": True,
+            "priorityExpiresAt": {"lte": now}
+        }
+    )
+    for ep in expired_products:
+        await db.product.update(where={"id": ep.id}, data={"isPriority": False})
+
     products = await db.product.find_many(
         where=query,
         include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
-        order={"createdAt": "desc"},
+        order=[{"isPriority": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )

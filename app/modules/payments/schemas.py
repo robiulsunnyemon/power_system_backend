@@ -34,3 +34,12 @@ class OnboardingLinkResponse(BaseModel):
     onboarding_url: str
     stripe_account_id: str
 
+class PriorityBoostProductRequest(BaseModel):
+    product_id: int
+
+class PriorityBoostServiceRequest(BaseModel):
+    service_id: int
+
+class PriorityBoostUrgentJobRequest(BaseModel):
+    service_application_id: int
+
