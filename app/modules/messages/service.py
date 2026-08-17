@@ -42,66 +42,81 @@ async def get_conversations(user_id: int, page: int = 1, page_size: int = 10):
     Fetches a list of conversations for the user with pagination.
     Each conversation includes the last message and unread count.
     """
-    # 1. Get all messages where the user is either sender or receiver
-    messages = await db.message.find_many(
-        where={
-            "OR": [
-                {"senderId": user_id},
-                {"receiverId": user_id}
-            ]
-        },
-        include={
-            "sender": {"include": {"profile": True}},
-            "receiver": {"include": {"profile": True}}
-        },
-        order={"createdAt": "desc"}
-    )
+    try:
+        # 1. Get all messages where the user is either sender or receiver
+        messages = await db.message.find_many(
+            where={
+                "OR": [
+                    {"senderId": user_id},
+                    {"receiverId": user_id}
+                ]
+            },
+            include={
+                "sender": {"include": {"profile": True}},
+                "receiver": {"include": {"profile": True}}
+            },
+            order={"createdAt": "desc"}
+        )
 
-    conversations_dict = {}
-    
-    for msg in messages:
-        # Determine the other user in the conversation
-        other_user = msg.receiver if msg.senderId == user_id else msg.sender
-        other_id = other_user.id
+        conversations_dict = {}
         
-        # Skip self-conversations
-        if other_id == user_id:
-            continue
-        
-        if other_id not in conversations_dict:
-            # First time seeing this conversation partner (since we ordered by desc, this is the latest message)
-            unread_count = await db.message.count(
-                where={
-                    "senderId": other_id,
-                    "receiverId": user_id,
-                    "isRead": False
+        for msg in messages:
+            # Determine the other user in the conversation
+            other_user = msg.receiver if msg.senderId == user_id else msg.sender
+            if not other_user:
+                continue
+            other_id = other_user.id
+            
+            # Skip self-conversations
+            if other_id == user_id:
+                continue
+            
+            if other_id not in conversations_dict:
+                # First time seeing this conversation partner (since we ordered by desc, this is the latest message)
+                unread_count = await db.message.count(
+                    where={
+                        "senderId": other_id,
+                        "receiverId": user_id,
+                        "isRead": False
+                    }
+                )
+                
+                other_profile = getattr(other_user, "profile", None)
+                other_image = getattr(other_profile, "profile_image", None) if other_profile else None
+                other_name = getattr(other_user, "fullname", "User") or "User"
+                
+                conversations_dict[other_id] = {
+                    "other_user_id": other_id,
+                    "other_user_name": other_name,
+                    "other_user_image": other_image,
+                    "last_message": msg.content if msg.type == "TEXT" else "[File]",
+                    "last_message_time": msg.createdAt,
+                    "unread_count": unread_count,
+                    "is_online": manager.is_user_online(other_id)
                 }
-            )
-            
-            conversations_dict[other_id] = {
-                "other_user_id": other_id,
-                "other_user_name": other_user.fullname,
-                "other_user_image": other_user.profile.profile_image if other_user.profile else None,
-                "last_message": msg.content if msg.type == "TEXT" else "[File]",
-                "last_message_time": msg.createdAt,
-                "unread_count": unread_count,
-                "is_online": manager.is_user_online(other_id)
-            }
-            
-    all_conversations = list(conversations_dict.values())
-    total = len(all_conversations)
-    
-    # Apply pagination
-    start = (page - 1) * page_size
-    end = start + page_size
-    paginated_list = all_conversations[start:end]
+                
+        all_conversations = list(conversations_dict.values())
+        total = len(all_conversations)
+        
+        # Apply pagination
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated_list = all_conversations[start:end]
 
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "conversations": paginated_list
-    }
+        return {
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "conversations": paginated_list
+        }
+    except Exception as e:
+        print(f"Error fetching conversations for user {user_id}: {e}")
+        return {
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "conversations": []
+        }
 
 async def get_chat_history(user_id: int, other_user_id: int, page: int = 1, page_size: int = 20):
     """
