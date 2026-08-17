@@ -72,8 +72,18 @@ async def create_review(buyer_id: int, data: ReviewCreate):
     profile = await db.userprofile.find_unique(where={"userId": order.product.sellerId})
     current_raw = profile.raw_score if profile else 0
     
-    points = data.rating * 20
-    new_raw = current_raw + points
+    if data.rating >= 5:
+        points = 100
+    elif data.rating == 4:
+        points = 60
+    elif data.rating == 3:
+        points = 20
+    elif data.rating == 2:
+        points = -50
+    else:
+        points = -100
+        
+    new_raw = max(0.0, current_raw + points)
     new_trust = calculate_trust_score(new_raw)
     
     await db.userprofile.upsert(

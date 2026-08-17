@@ -16,9 +16,10 @@ async def save_message(sender_id: int, data: MessageCreate):
             "fileUrl": data.fileUrl,
             "senderId": sender_id,
             "receiverId": data.receiverId,
-            "replyToId": data.replyToId
+            "replyToId": data.replyToId,
+            "productId": data.productId
         },
-        include={"sender": True}
+        include={"sender": True, "product": True}
     )
     
     # Notify Receiver (Push Only)

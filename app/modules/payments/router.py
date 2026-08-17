@@ -35,7 +35,7 @@ from app.core.pricing_engine import (
     PRIORITY_DURATION_HOURS
 )
 from app.core.db import db
-from prisma.enums import PaymentMethod, PaymentStatus
+from prisma.enums import PaymentMethod, PaymentStatus, ProductStatus, OrderStatus
 
 router = APIRouter(prefix="/payments", tags=["Payments"])
 
@@ -44,6 +44,12 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
     product = await db.product.find_unique(where={"id": req.product_id})
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+    
+    if product.status != ProductStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="This product is already sold or unavailable")
+        
+    if product.sellerId == current_user_id:
+        raise HTTPException(status_code=400, detail="You cannot purchase your own product")
         
     subtotal = product.price
     platform_fee = calculate_platform_fee(subtotal, "PRODUCT")
@@ -84,7 +90,7 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
         if req.is_escrow:
             payment_status = PaymentStatus.HELD_IN_ESCROW
             
-    # Create the order
+    # Create the order with complete delivery info
     order = await db.order.create(
         data={
             "userId": current_user_id,
@@ -100,10 +106,21 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
             "stripeIntentId": intent_id,
             "distanceKm": req.distance_km,
             "deliveryAddons": req.delivery_addons,
+            "deliveryAddress": req.delivery_address,
+            "deliveryCity": req.delivery_city,
+            "recipientName": req.recipient_name,
+            "recipientPhone": req.recipient_phone,
+            "deliveryInstructions": req.delivery_instructions,
             "hasProtection": req.has_protection,
             "isEscrow": req.is_escrow,
             "isCOD": req.is_cod
         }
+    )
+    
+    # Mark product SOLDOUT immediately to prevent duplicate purchases
+    await db.product.update(
+        where={"id": product.id},
+        data={"status": ProductStatus.SOLDOUT}
     )
     
     return {
@@ -509,6 +526,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 where={"id": order.id},
                 data={"paymentStatus": PaymentStatus.PAID}
             )
+            if order.productId:
+                await db.product.update(
+                    where={"id": order.productId},
+                    data={"status": ProductStatus.SOLDOUT}
+                )
             # Log Transaction
             await db.transaction.create(data={
                 "amount": float(data_object['amount_received']) / 100,
@@ -529,6 +551,11 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 where={"id": order.id},
                 data={"paymentStatus": PaymentStatus.HELD_IN_ESCROW}
             )
+            if order.productId:
+                await db.product.update(
+                    where={"id": order.productId},
+                    data={"status": ProductStatus.SOLDOUT}
+                )
             
     elif event_type == 'charge.refunded':
         intent_id = data_object['payment_intent']
@@ -536,8 +563,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         if order:
             await db.order.update(
                 where={"id": order.id},
-                data={"paymentStatus": PaymentStatus.REFUNDED}
+                data={"paymentStatus": PaymentStatus.REFUNDED, "status": OrderStatus.CANCELLED}
             )
+            if order.productId:
+                await db.product.update(
+                    where={"id": order.productId},
+                    data={"status": ProductStatus.ACTIVE}
+                )
             # Log Refund Transaction
             await db.transaction.create(data={
                 "amount": float(data_object['amount_refunded']) / 100,
@@ -548,6 +580,20 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "userId": order.userId,
                 "orderId": order.id
             })
+            
+    elif event_type == 'payment_intent.payment_failed':
+        intent_id = data_object['id']
+        order = await db.order.find_first(where={"stripeIntentId": intent_id})
+        if order:
+            await db.order.update(
+                where={"id": order.id},
+                data={"paymentStatus": PaymentStatus.FAILED, "status": OrderStatus.CANCELLED}
+            )
+            if order.productId:
+                await db.product.update(
+                    where={"id": order.productId},
+                    data={"status": ProductStatus.ACTIVE}
+                )
             
     elif event_type == 'charge.dispute.created':
         intent_id = data_object['payment_intent']

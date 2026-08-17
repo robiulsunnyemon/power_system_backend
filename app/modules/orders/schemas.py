@@ -50,6 +50,11 @@ class OrderResponse(BaseModel):
     # Delivery & Addons
     distanceKm: Optional[float] = None
     deliveryAddons: List[str] = []
+    deliveryAddress: Optional[str] = None
+    deliveryCity: Optional[str] = None
+    recipientName: Optional[str] = None
+    recipientPhone: Optional[str] = None
+    deliveryInstructions: Optional[str] = None
     
     # Mechanics
     hasProtection: bool = False

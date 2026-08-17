@@ -186,6 +186,7 @@ model Product {
   category      Category         @relation(fields: [categoryId], references: [id])
   orders        Order[]
   reviews       Review[]
+  messages      Message[]
 
   @@map("products")
 }
@@ -208,9 +209,14 @@ model Order {
   paymentStatus    PaymentStatus   @default(PENDING)
   stripeIntentId   String?
   
-  // Delivery & Addons
-  distanceKm       Float?
-  deliveryAddons   String[]
+  // Delivery Details & Addons
+  distanceKm           Float?
+  deliveryAddons       String[]
+  deliveryAddress      String?
+  deliveryCity         String?
+  recipientName        String?
+  recipientPhone       String?
+  deliveryInstructions String?
   
   // Mechanics
   hasProtection    Boolean         @default(false)
@@ -279,6 +285,9 @@ model Message {
 
   receiverId  Int
   receiver    User        @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  productId   Int?
+  product     Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   replyToId   Int?
   replyTo     Message?    @relation("MessageReplies", fields: [replyToId], references: [id])

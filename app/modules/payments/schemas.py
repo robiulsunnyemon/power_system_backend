@@ -5,6 +5,11 @@ class CheckoutProductRequest(BaseModel):
     product_id: int
     distance_km: Optional[float] = 0.0
     delivery_addons: List[str] = []
+    delivery_address: Optional[str] = None
+    delivery_city: Optional[str] = None
+    recipient_name: Optional[str] = None
+    recipient_phone: Optional[str] = None
+    delivery_instructions: Optional[str] = None
     has_protection: bool = False
     is_escrow: bool = False
     is_cod: bool = False

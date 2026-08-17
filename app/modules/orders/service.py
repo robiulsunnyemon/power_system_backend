@@ -184,6 +184,8 @@ async def update_order_status(seller_id: int, order_id: int, data: schemas.Order
         tracking_data.append({"status": "ORDER CONFIRM"})
     elif data.status == OrderStatus.DELIVERED:
         tracking_data.append({"status": "ORDER DELIVERY"})
+    elif data.status == OrderStatus.CANCELLED:
+        tracking_data.append({"status": "ORDER CANCELLED"})
 
     # 4. Update status and add tracking
     updated_order = await db.order.update(
@@ -201,28 +203,38 @@ async def update_order_status(seller_id: int, order_id: int, data: schemas.Order
         }
     )
 
-    # 5. Update Seller Trust Score on Delivery
+    # 5. Update Seller Trust Score & Product Status based on resolution
     if data.status == OrderStatus.DELIVERED:
-        # Fetch current profile or assume 0 if not exists
         profile = await db.userprofile.find_unique(where={"userId": order.product.sellerId})
         current_raw = profile.raw_score if profile else 0
-        
         new_raw = current_raw + 200
         new_trust = calculate_trust_score(new_raw)
         
-        # Use upsert to handle cases where profile doesn't exist
         await db.userprofile.upsert(
             where={"userId": order.product.sellerId},
             data={
-                "create": {
-                    "userId": order.product.sellerId,
-                    "raw_score": new_raw,
-                    "trust_score": new_trust
-                },
-                "update": {
-                    "raw_score": new_raw,
-                    "trust_score": new_trust
-                }
+                "create": {"userId": order.product.sellerId, "raw_score": new_raw, "trust_score": new_trust},
+                "update": {"raw_score": new_raw, "trust_score": new_trust}
+            }
+        )
+    elif data.status == OrderStatus.CANCELLED:
+        # Revert product to ACTIVE so it can be discovered and purchased again
+        if order.productId:
+            await db.product.update(
+                where={"id": order.productId},
+                data={"status": ProductStatus.ACTIVE}
+            )
+        # Cancellation penalty on seller trust score
+        profile = await db.userprofile.find_unique(where={"userId": order.product.sellerId})
+        current_raw = profile.raw_score if profile else 0
+        new_raw = max(0.0, current_raw - 150)
+        new_trust = calculate_trust_score(new_raw)
+        
+        await db.userprofile.upsert(
+            where={"userId": order.product.sellerId},
+            data={
+                "create": {"userId": order.product.sellerId, "raw_score": new_raw, "trust_score": new_trust},
+                "update": {"raw_score": new_raw, "trust_score": new_trust}
             }
         )
     

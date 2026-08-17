@@ -19,7 +19,7 @@ class ServiceCreate(BaseModel):
     requirements: Optional[List[Requirement]] = None
     availability: Optional[List[str]] = None
     images: List[str]
-    status: ServiceStatus = ServiceStatus.DRAFT
+    status: ServiceStatus = ServiceStatus.PUBLISHED
 
 class ServiceUpdate(BaseModel):
     title: Optional[str] = None

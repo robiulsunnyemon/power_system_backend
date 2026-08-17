@@ -9,6 +9,7 @@ class MessageCreate(BaseModel):
     type: MessageType = MessageType.TEXT
     fileUrl: Optional[str] = None
     replyToId: Optional[int] = None
+    productId: Optional[int] = None
 
 class MessageResponse(BaseModel):
     id: int
@@ -19,6 +20,7 @@ class MessageResponse(BaseModel):
     fileUrl: Optional[str]
     isRead: bool
     replyToId: Optional[int]
+    productId: Optional[int] = None
     createdAt: datetime
 
     class Config:
