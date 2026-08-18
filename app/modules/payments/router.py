@@ -117,16 +117,40 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
         }
     )
     
-    # Mark product SOLDOUT immediately to prevent duplicate purchases
-    await db.product.update(
-        where={"id": product.id},
-        data={"status": ProductStatus.SOLDOUT}
-    )
+    # For COD orders, mark product SOLDOUT immediately upon order placement
+    if req.is_cod:
+        await db.product.update(
+            where={"id": product.id},
+            data={"status": ProductStatus.SOLDOUT}
+        )
     
     return {
         "order": order,
         "client_secret": client_secret
     }
+
+@router.post("/checkout/cancel")
+async def cancel_checkout(order_id: int, current_user_id: int = Depends(get_current_user_id)):
+    """
+    Cancels a pending checkout session and ensures the product remains ACTIVE.
+    """
+    order = await db.order.find_first(
+        where={"id": order_id, "userId": current_user_id}
+    )
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    if order.paymentStatus == PaymentStatus.PENDING:
+        await db.order.update(
+            where={"id": order.id},
+            data={"status": OrderStatus.CANCELLED, "paymentStatus": PaymentStatus.FAILED}
+        )
+        if order.productId:
+            await db.product.update(
+                where={"id": order.productId},
+                data={"status": ProductStatus.ACTIVE}
+            )
+    return {"status": "success", "message": "Checkout session cancelled"}
 
 @router.post("/checkout/service")
 async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = Depends(get_current_user_id)):
