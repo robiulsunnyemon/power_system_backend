@@ -83,9 +83,9 @@ async def create_connect_onboarding_link(account_id: str, refresh_url: str, retu
 async def retrieve_connect_account_status(account_id: str):
     try:
         account = stripe.Account.retrieve(account_id)
-        payouts_enabled = account.get("payouts_enabled", False)
-        charges_enabled = account.get("charges_enabled", False)
-        details_submitted = account.get("details_submitted", False)
+        payouts_enabled = getattr(account, "payouts_enabled", False)
+        charges_enabled = getattr(account, "charges_enabled", False)
+        details_submitted = getattr(account, "details_submitted", False)
         
         status = "PENDING"
         if payouts_enabled and charges_enabled:

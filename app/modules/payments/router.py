@@ -508,7 +508,7 @@ async def process_refund(req: RefundRequest, current_user_id: int = Depends(get_
             "currency": "usd",
             "type": "REFUND",
             "status": "COMPLETED",
-            "stripeChargeId": str(refund_res.get("id", "")),
+            "stripeChargeId": str(getattr(refund_res, "id", "")),
             "userId": current_user_id,
             "orderId": order.id
         })
@@ -561,7 +561,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "currency": data_object['currency'],
                 "type": "PAYMENT",
                 "status": "COMPLETED",
-                "stripeChargeId": data_object.get("latest_charge"),
+                "stripeChargeId": getattr(data_object, "latest_charge", None),
                 "userId": order.userId,
                 "orderId": order.id
             })
