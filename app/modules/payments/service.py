@@ -7,10 +7,15 @@ from app.core.config import get_settings
 
 def get_stripe_api_key():
     key = os.getenv("STRIPE_SECRET_KEY") or get_settings().STRIPE_SECRET_KEY
-    if not key:
-        raise HTTPException(status_code=500, detail="STRIPE_SECRET_KEY is not configured in environment variables.")
-    stripe.api_key = key
+    if key:
+        stripe.api_key = key
     return key
+
+# Set Stripe API key on module load
+try:
+    get_stripe_api_key()
+except Exception:
+    pass
 
 async def create_payment_intent(amount: float, currency: str = "usd", is_escrow: bool = False, metadata: dict = None):
     get_stripe_api_key()
@@ -33,6 +38,7 @@ async def create_payment_intent(amount: float, currency: str = "usd", is_escrow:
         raise HTTPException(status_code=400, detail=str(e))
 
 async def capture_escrow_intent(intent_id: str):
+    get_stripe_api_key()
     try:
         intent = stripe.PaymentIntent.retrieve(intent_id)
         if intent.status == "requires_capture":
@@ -42,6 +48,7 @@ async def capture_escrow_intent(intent_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 async def refund_payment(intent_id: str, amount: float = None):
+    get_stripe_api_key()
     try:
         refund_kwargs = {"payment_intent": intent_id}
         if amount is not None:
@@ -53,6 +60,7 @@ async def refund_payment(intent_id: str, amount: float = None):
         raise HTTPException(status_code=400, detail=str(e))
 
 async def create_stripe_connect_account(user_id: int, email: str, country: str = "US"):
+    get_stripe_api_key()
     try:
         account = stripe.Account.create(
             type="express",
@@ -69,6 +77,7 @@ async def create_stripe_connect_account(user_id: int, email: str, country: str =
         raise HTTPException(status_code=400, detail=str(e))
 
 async def create_connect_onboarding_link(account_id: str, refresh_url: str, return_url: str):
+    get_stripe_api_key()
     try:
         account_link = stripe.AccountLink.create(
             account=account_id,
@@ -81,6 +90,7 @@ async def create_connect_onboarding_link(account_id: str, refresh_url: str, retu
         raise HTTPException(status_code=400, detail=str(e))
 
 async def retrieve_connect_account_status(account_id: str):
+    get_stripe_api_key()
     try:
         account = stripe.Account.retrieve(account_id)
         payouts_enabled = getattr(account, "payouts_enabled", False)
@@ -103,6 +113,7 @@ async def retrieve_connect_account_status(account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 async def create_stripe_dashboard_login_link(account_id: str):
+    get_stripe_api_key()
     try:
         link = stripe.Account.create_login_link(account_id)
         return link.url
@@ -110,6 +121,7 @@ async def create_stripe_dashboard_login_link(account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 async def transfer_to_connected_account(amount: float, destination_account_id: str, currency: str = "usd", transfer_group: str = None):
+    get_stripe_api_key()
     try:
         amount_cents = int(amount * 100)
         transfer_kwargs = {

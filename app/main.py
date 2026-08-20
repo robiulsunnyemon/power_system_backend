@@ -22,9 +22,15 @@ from app.modules.payments.router import router as payments_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
+from app.modules.payments.service import get_stripe_api_key
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await connect_db()
+    try:
+        get_stripe_api_key()
+    except Exception as e:
+        print(f"Warning: Stripe API Key initialization at startup: {e}")
     yield
     await disconnect_db()
 
