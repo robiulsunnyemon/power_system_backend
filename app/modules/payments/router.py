@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from fastapi.responses import HTMLResponse
 import stripe
 import os
 from datetime import datetime, timedelta, timezone
@@ -310,14 +311,198 @@ async def get_stripe_onboarding_link(req: CreateOnboardingLinkRequest, current_u
         
     onboarding_url = await create_connect_onboarding_link(
         account_id=account_id,
-        refresh_url=req.refresh_url or "https://jordencuz.com/stripe/connect/refresh",
-        return_url=req.return_url or "https://jordencuz.com/stripe/connect/return"
+        refresh_url=req.refresh_url or "https://www.powersystem.maktechapp.cloud/payments/stripe-connect/refresh",
+        return_url=req.return_url or "https://www.powersystem.maktechapp.cloud/payments/stripe-connect/return"
     )
     
     return {
         "onboarding_url": onboarding_url,
         "stripe_account_id": account_id
     }
+
+@router.get("/stripe-connect/return", response_class=HTMLResponse)
+async def stripe_connect_return():
+    """
+    Landing page when a seller completes Stripe Connect onboarding.
+    """
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Stripe Connect Onboarding Complete</title>
+        <style>
+            body {
+                background-color: #121212;
+                color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+            .card {
+                background-color: #1e1e1e;
+                border: 1px solid #333333;
+                border-radius: 16px;
+                padding: 40px 30px;
+                text-align: center;
+                max-width: 420px;
+                width: 100%;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+            .icon-circle {
+                width: 72px;
+                height: 72px;
+                background-color: rgba(41, 176, 0, 0.15);
+                border: 2px solid #29B000;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px auto;
+            }
+            .icon-circle svg {
+                width: 36px;
+                height: 36px;
+                fill: #29B000;
+            }
+            h1 {
+                font-size: 22px;
+                font-weight: 700;
+                margin-bottom: 12px;
+                color: #ffffff;
+            }
+            p {
+                font-size: 14px;
+                color: #a0a0a0;
+                line-height: 1.6;
+                margin-bottom: 28px;
+            }
+            .badge {
+                display: inline-block;
+                background-color: #DD9E40;
+                color: #000000;
+                font-weight: 700;
+                padding: 6px 16px;
+                border-radius: 20px;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="icon-circle">
+                <svg viewBox="0 0 24 24">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+            </div>
+            <h1>Onboarding Completed!</h1>
+            <p>Your Stripe payout account has been configured successfully. You can now receive payments and payouts directly.</p>
+            <div class="badge">Return to Jorden App</div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+@router.get("/stripe-connect/refresh", response_class=HTMLResponse)
+async def stripe_connect_refresh():
+    """
+    Landing page when a seller's Stripe Connect onboarding session expires or is interrupted.
+    """
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Onboarding Session Expired</title>
+        <style>
+            body {
+                background-color: #121212;
+                color: #ffffff;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                min-height: 100vh;
+                margin: 0;
+                padding: 20px;
+                box-sizing: border-box;
+            }
+            .card {
+                background-color: #1e1e1e;
+                border: 1px solid #333333;
+                border-radius: 16px;
+                padding: 40px 30px;
+                text-align: center;
+                max-width: 420px;
+                width: 100%;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            }
+            .icon-circle {
+                width: 72px;
+                height: 72px;
+                background-color: rgba(221, 158, 64, 0.15);
+                border: 2px solid #DD9E40;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0 auto 24px auto;
+            }
+            .icon-circle svg {
+                width: 36px;
+                height: 36px;
+                fill: #DD9E40;
+            }
+            h1 {
+                font-size: 22px;
+                font-weight: 700;
+                margin-bottom: 12px;
+                color: #ffffff;
+            }
+            p {
+                font-size: 14px;
+                color: #a0a0a0;
+                line-height: 1.6;
+                margin-bottom: 28px;
+            }
+            .badge {
+                display: inline-block;
+                background-color: #DD9E40;
+                color: #000000;
+                font-weight: 700;
+                padding: 6px 16px;
+                border-radius: 20px;
+                font-size: 12px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="icon-circle">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+            </div>
+            <h1>Session Expired</h1>
+            <p>Your onboarding session has expired or was interrupted. Please return to the Jorden App and tap Connect again to generate a fresh link.</p>
+            <div class="badge">Return to Jorden App</div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
 
 @router.get("/stripe-connect/status", response_model=StripeConnectStatusResponse)
 async def check_stripe_connect_status(current_user_id: int = Depends(get_current_user_id)):

@@ -26,8 +26,8 @@ class RefundRequest(BaseModel):
     reason: Optional[str] = None
 
 class CreateOnboardingLinkRequest(BaseModel):
-    refresh_url: Optional[str] = "https://jordencuz.com/stripe/connect/refresh"
-    return_url: Optional[str] = "https://jordencuz.com/stripe/connect/return"
+    refresh_url: Optional[str] = "https://www.powersystem.maktechapp.cloud/payments/stripe-connect/refresh"
+    return_url: Optional[str] = "https://www.powersystem.maktechapp.cloud/payments/stripe-connect/return"
 
 class StripeConnectStatusResponse(BaseModel):
     stripe_account_id: Optional[str] = None
