@@ -383,16 +383,21 @@ async def stripe_connect_return():
                 line-height: 1.6;
                 margin-bottom: 28px;
             }
-            .badge {
+            .btn {
                 display: inline-block;
                 background-color: #DD9E40;
                 color: #000000;
                 font-weight: 700;
-                padding: 6px 16px;
-                border-radius: 20px;
-                font-size: 12px;
+                padding: 12px 24px;
+                border-radius: 24px;
+                font-size: 14px;
+                text-decoration: none;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                transition: background-color 0.2s ease;
+            }
+            .btn:hover {
+                background-color: #c98d36;
             }
         </style>
     </head>
@@ -405,8 +410,13 @@ async def stripe_connect_return():
             </div>
             <h1>Onboarding Completed!</h1>
             <p>Your Stripe payout account has been configured successfully. You can now receive payments and payouts directly.</p>
-            <div class="badge">Return to Jorden App</div>
+            <a href="jordenapp://stripe-connect/return" class="btn">RETURN TO JORDEN APP</a>
         </div>
+        <script>
+            setTimeout(function() {
+                window.location.href = "jordenapp://stripe-connect/return";
+            }, 800);
+        </script>
     </body>
     </html>
     """
@@ -475,16 +485,21 @@ async def stripe_connect_refresh():
                 line-height: 1.6;
                 margin-bottom: 28px;
             }
-            .badge {
+            .btn {
                 display: inline-block;
                 background-color: #DD9E40;
                 color: #000000;
                 font-weight: 700;
-                padding: 6px 16px;
-                border-radius: 20px;
-                font-size: 12px;
+                padding: 12px 24px;
+                border-radius: 24px;
+                font-size: 14px;
+                text-decoration: none;
                 text-transform: uppercase;
                 letter-spacing: 1px;
+                transition: background-color 0.2s ease;
+            }
+            .btn:hover {
+                background-color: #c98d36;
             }
         </style>
     </head>
@@ -497,8 +512,13 @@ async def stripe_connect_refresh():
             </div>
             <h1>Session Expired</h1>
             <p>Your onboarding session has expired or was interrupted. Please return to the Jorden App and tap Connect again to generate a fresh link.</p>
-            <div class="badge">Return to Jorden App</div>
+            <a href="jordenapp://stripe-connect/refresh" class="btn">RETURN TO JORDEN APP</a>
         </div>
+        <script>
+            setTimeout(function() {
+                window.location.href = "jordenapp://stripe-connect/refresh";
+            }, 800);
+        </script>
     </body>
     </html>
     """
