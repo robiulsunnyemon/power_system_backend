@@ -25,8 +25,12 @@ async def send_otp_email(email: str, otp: str):
         body=f"Your OTP code is: {otp}. It is valid for 10 minutes.",
         subtype=MessageType.plain
     )
-    fm = FastMail(conf)
-    await fm.send_message(message)
+    try:
+        fm = FastMail(conf)
+        await fm.send_message(message)
+        print(f"[MAILER] OTP email successfully sent to {email}")
+    except Exception as e:
+        print(f"[MAILER ERROR] Failed to send OTP email to {email}: {e}")
 
 def generate_otp(length: int = 6) -> str:
     return "".join(random.choices(string.digits, k=length))
