@@ -17,7 +17,41 @@ try:
 except Exception:
     pass
 
-async def create_payment_intent(amount: float, currency: str = "usd", is_escrow: bool = False, metadata: dict = None):
+async def get_or_create_stripe_customer(user_id: int):
+    get_stripe_api_key()
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if user.stripeCustomerId:
+        return user.stripeCustomerId
+        
+    try:
+        customer = stripe.Customer.create(
+            email=user.email,
+            name=user.fullname,
+            metadata={"user_id": str(user.id)}
+        )
+        await db.user.update(
+            where={"id": user.id},
+            data={"stripeCustomerId": customer.id}
+        )
+        return customer.id
+    except stripe.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+async def create_ephemeral_key(customer_id: str, stripe_version: str = "2022-11-15"):
+    get_stripe_api_key()
+    try:
+        key = stripe.EphemeralKey.create(
+            customer=customer_id,
+            stripe_version=stripe_version
+        )
+        return key.secret
+    except stripe.StripeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+async def create_payment_intent(amount: float, currency: str = "usd", is_escrow: bool = False, metadata: dict = None, customer_id: str = None):
     get_stripe_api_key()
     try:
         amount_cents = int(amount * 100)
@@ -28,6 +62,10 @@ async def create_payment_intent(amount: float, currency: str = "usd", is_escrow:
             "metadata": metadata or {},
         }
         
+        if customer_id:
+            intent_kwargs["customer"] = customer_id
+            intent_kwargs["setup_future_usage"] = "off_session"
+            
         # If Escrow, we only authorize the charge. We capture it later.
         if is_escrow:
             intent_kwargs["capture_method"] = "manual"

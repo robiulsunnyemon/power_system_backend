@@ -27,6 +27,7 @@ model User {
   tokenVersion  Int           @default(1)
   lastActiveRole Role?         @default(USER)
   fcmToken      String?
+  stripeCustomerId    String?       @unique
   stripeAccountId     String?       @unique
   stripeAccountStatus String?       @default("PENDING")
   payoutsEnabled      Boolean       @default(false)

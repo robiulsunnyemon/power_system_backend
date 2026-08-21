@@ -22,7 +22,9 @@ from .service import (
     create_connect_onboarding_link,
     retrieve_connect_account_status,
     create_stripe_dashboard_login_link,
-    transfer_to_connected_account
+    transfer_to_connected_account,
+    get_or_create_stripe_customer,
+    create_ephemeral_key
 )
 from app.modules.users.router import get_current_user_id
 from app.core.pricing_engine import (
@@ -71,6 +73,8 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
     
     intent_id = None
     client_secret = None
+    customer_id = None
+    ephemeral_key = None
     payment_status = PaymentStatus.PENDING
     payment_method = PaymentMethod.STRIPE
     
@@ -81,10 +85,13 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
         payment_method = PaymentMethod.COD
     else:
         # Stripe Flow
+        customer_id = await get_or_create_stripe_customer(current_user_id)
+        ephemeral_key = await create_ephemeral_key(customer_id)
         intent = await create_payment_intent(
             amount=total_amount, 
             is_escrow=req.is_escrow,
-            metadata={"product_id": req.product_id, "user_id": current_user_id}
+            metadata={"product_id": req.product_id, "user_id": current_user_id},
+            customer_id=customer_id
         )
         intent_id = intent.id
         client_secret = intent.client_secret
@@ -127,7 +134,9 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
     
     return {
         "order": order,
-        "client_secret": client_secret
+        "client_secret": client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key
     }
 
 @router.post("/checkout/cancel")
@@ -174,6 +183,8 @@ async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = D
     
     intent_id = None
     client_secret = None
+    customer_id = None
+    ephemeral_key = None
     payment_status = PaymentStatus.PENDING
     payment_method = PaymentMethod.STRIPE
     
@@ -182,10 +193,13 @@ async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = D
         platform_fee = protection_fee = escrow_fee = 0.0
         payment_method = PaymentMethod.COD
     else:
+        customer_id = await get_or_create_stripe_customer(current_user_id)
+        ephemeral_key = await create_ephemeral_key(customer_id)
         intent = await create_payment_intent(
             amount=total_amount, 
             is_escrow=req.is_escrow,
-            metadata={"service_application_id": req.service_application_id, "user_id": current_user_id}
+            metadata={"service_application_id": req.service_application_id, "user_id": current_user_id},
+            customer_id=customer_id
         )
         intent_id = intent.id
         client_secret = intent.client_secret
@@ -212,7 +226,9 @@ async def checkout_service(req: CheckoutServiceRequest, current_user_id: int = D
     
     return {
         "service_application": updated_app,
-        "client_secret": client_secret
+        "client_secret": client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key
     }
 
 @router.post("/escrow/{order_id}/release")
