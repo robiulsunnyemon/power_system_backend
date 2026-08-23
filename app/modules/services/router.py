@@ -1,10 +1,16 @@
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException,status, UploadFile, File
 from typing import List, Optional
-from app.modules.services.schemas import ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse, PaginatedServiceResponse, ServiceCategoryListResponse, ProviderServicesResponse
+from app.modules.services.schemas import (
+    ServiceCreate, ServiceUpdate, ServiceResponse, ServiceListResponse,
+    PaginatedServiceResponse, ServiceCategoryListResponse, ProviderServicesResponse,
+    ServiceCreationPaymentResponse
+)
 from app.modules.products.schemas import ImageUploadResponse
 from app.modules.services.service import (
-    create_service, get_provider_services, get_all_services, update_service, delete_service, get_service_by_id, get_published_service_categories, search_services, upload_service_images
+    create_service, confirm_service_payment, get_provider_services, get_all_services,
+    update_service, delete_service, get_service_by_id, get_published_service_categories,
+    search_services, upload_service_images
 )
 from app.modules.users.router import get_current_user_id
 from app.core.db import db
@@ -34,12 +40,27 @@ async def upload_images_endpoint(
     """
     return await upload_service_images(images)
 
-@router.post("/", response_model=ServiceResponse,status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=ServiceCreationPaymentResponse, status_code=status.HTTP_201_CREATED)
 async def create_service_endpoint(
     data: ServiceCreate,
     provider_id: int = Depends(check_provider_role)
 ):
+    """
+    Create a new service with upfront platform and optional priority charges.
+    Returns service metadata along with Stripe payment client_secret.
+    """
     return await create_service(provider_id, data)
+
+@router.post("/{service_id}/confirm-payment", response_model=ServiceResponse, status_code=status.HTTP_200_OK)
+async def confirm_service_payment_endpoint(
+    service_id: int = Path(..., title="The ID of the service to confirm payment for"),
+    provider_id: int = Depends(check_provider_role)
+):
+    """
+    Confirm Stripe payment for service creation and publish the service.
+    """
+    return await confirm_service_payment(provider_id, service_id)
+
 
 @router.get("/my-services", response_model=ProviderServicesResponse, status_code=status.HTTP_200_OK)
 async def get_my_services_endpoint(

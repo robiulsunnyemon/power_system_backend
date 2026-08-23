@@ -57,6 +57,23 @@ async def update_setting(
     """
     return await service.update_setting(setting_id, data)
 
+@router.get("/service-charges", response_model=schemas.ServiceChargesResponse)
+async def get_service_charges_endpoint():
+    """
+    Public: Get current platform and priority charges for service creation.
+    """
+    return await service.get_service_charges()
+
+@router.put("/service-charges", response_model=schemas.ServiceChargesResponse)
+async def update_service_charges_endpoint(
+    data: schemas.ServiceChargesUpdate,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin only: Update platform and priority charges for service creation.
+    """
+    return await service.update_service_charges(data)
+
 @router.delete("/{setting_id}")
 async def delete_setting(
     setting_id: int,
@@ -66,3 +83,4 @@ async def delete_setting(
     Admin only: Delete a setting entry.
     """
     return await service.delete_setting(setting_id)
+

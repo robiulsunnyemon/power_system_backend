@@ -19,7 +19,8 @@ class ServiceCreate(BaseModel):
     requirements: Optional[List[Requirement]] = None
     availability: Optional[List[str]] = None
     images: List[str]
-    status: ServiceStatus = ServiceStatus.PUBLISHED
+    isPriority: bool = False
+    status: ServiceStatus = ServiceStatus.DRAFT
 
 class ServiceUpdate(BaseModel):
     title: Optional[str] = None
@@ -48,6 +49,11 @@ class ServiceResponse(BaseModel):
     status: ServiceStatus
     isPriority: bool = False
     priorityExpiresAt: Optional[datetime] = None
+    platformFeePaid: float = 0.0
+    priorityFeePaid: float = 0.0
+    totalChargePaid: float = 0.0
+    paymentStatus: Optional[str] = None
+    stripeIntentId: Optional[str] = None
     createdAt: datetime
     updatedAt: datetime
     providerId: int
@@ -56,6 +62,17 @@ class ServiceResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ServiceCreationPaymentResponse(BaseModel):
+    service: ServiceResponse
+    platform_charge: float
+    priority_charge: float
+    total_charge: float
+    client_secret: Optional[str] = None
+    customer_id: Optional[str] = None
+    ephemeral_key: Optional[str] = None
+    payment_required: bool = True
+
 
 class ServiceListResponse(BaseModel):
     total_services: int

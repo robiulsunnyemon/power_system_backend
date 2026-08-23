@@ -102,3 +102,65 @@ async def is_maintenance_mode_active() -> bool:
         return setting is not None and setting.content == "true"
     except Exception:
         return False
+
+async def get_service_charges():
+    """
+    Fetches the configured platform and priority charges for service creation.
+    Defaults: Platform Charge = $10.0, Priority Charge = $5.0.
+    """
+    platform_setting = await db.setting.find_unique(where={"title": SettingType.SERVICE_PLATFORM_CHARGE})
+    priority_setting = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
+
+    try:
+        platform_charge = float(platform_setting.content) if platform_setting and platform_setting.content else 10.0
+    except (ValueError, TypeError):
+        platform_charge = 10.0
+
+    try:
+        priority_charge = float(priority_setting.content) if priority_setting and priority_setting.content else 5.0
+    except (ValueError, TypeError):
+        priority_charge = 5.0
+
+    return {
+        "platform_charge": platform_charge,
+        "priority_charge": priority_charge
+    }
+
+async def update_service_charges(data):
+    """
+    Admin only: Updates or creates the platform and priority charge settings.
+    """
+    if data.platform_charge is not None:
+        platform_val = str(data.platform_charge)
+        existing_platform = await db.setting.find_unique(where={"title": SettingType.SERVICE_PLATFORM_CHARGE})
+        if existing_platform:
+            await db.setting.update(
+                where={"id": existing_platform.id},
+                data={"content": platform_val}
+            )
+        else:
+            await db.setting.create(
+                data={
+                    "title": SettingType.SERVICE_PLATFORM_CHARGE,
+                    "content": platform_val
+                }
+            )
+
+    if data.priority_charge is not None:
+        priority_val = str(data.priority_charge)
+        existing_priority = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
+        if existing_priority:
+            await db.setting.update(
+                where={"id": existing_priority.id},
+                data={"content": priority_val}
+            )
+        else:
+            await db.setting.create(
+                data={
+                    "title": SettingType.SERVICE_PRIORITY_CHARGE,
+                    "content": priority_val
+                }
+            )
+
+    return await get_service_charges()
+

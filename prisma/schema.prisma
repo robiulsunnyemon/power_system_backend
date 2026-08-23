@@ -339,6 +339,11 @@ model Service {
   
   isPriority    Boolean          @default(false)
   priorityExpiresAt DateTime?
+  platformFeePaid   Float         @default(0)
+  priorityFeePaid   Float         @default(0)
+  totalChargePaid   Float         @default(0)
+  stripeIntentId    String?
+  paymentStatus     PaymentStatus @default(PENDING)
   
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -430,6 +435,8 @@ enum SettingType {
   ABOUT_US
   PRIVACY_POLICY
   MAINTENANCE_MODE
+  SERVICE_PLATFORM_CHARGE
+  SERVICE_PRIORITY_CHARGE
 }
 
 model Setting {

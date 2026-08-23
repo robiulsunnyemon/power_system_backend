@@ -1,9 +1,17 @@
 from app.core.db import db
 from fastapi import HTTPException, UploadFile
 from typing import List, Optional
+from datetime import datetime, timezone, timedelta
 from app.common.cloudinary import upload_image
 from app.modules.services.schemas import ServiceCreate, ServiceUpdate
-from prisma.enums import ServiceStatus
+from app.modules.settings.service import get_service_charges
+from app.modules.payments.service import (
+    get_or_create_stripe_customer,
+    create_ephemeral_key,
+    create_payment_intent,
+    get_stripe_api_key
+)
+from prisma.enums import ServiceStatus, PaymentStatus
 from prisma.types import ServiceUpdateInput
 from prisma import Json
 import json
@@ -28,28 +36,66 @@ def format_service_response(service):
     Helper to format service data, flattening profile images.
     """
     s_dict = service.model_dump()
-    if service.provider:
+    if hasattr(service, "provider") and service.provider:
         s_dict["provider"] = {
             "id": service.provider.id,
             "fullname": service.provider.fullname,
             "email": service.provider.email,
             "displayname": service.provider.displayname,
-            "profile_image": service.provider.profile.profile_image if service.provider.profile else None
+            "profile_image": service.provider.profile.profile_image if hasattr(service.provider, "profile") and service.provider.profile else None
         }
     return s_dict
 
 async def create_service(provider_id: int, data: ServiceCreate):
     """
-    Creates a new service post.
+    Creates a new service post with upfront platform and optional priority fees.
+    Initially creates as DRAFT and PENDING payment until confirmed via Stripe.
     """
     # 1. Normalize Category Name
     category_name = data.category.strip() if data.category else None
     
-    # 3. Format requirements
+    # 2. Format requirements & availability
     req_data = [r.model_dump() for r in data.requirements] if data.requirements else []
     avail_data = data.availability if data.availability else []
-            
-    # 4. Create Service
+    
+    # 3. Calculate upfront fees from Admin settings
+    charges = await get_service_charges()
+    platform_charge = charges["platform_charge"]
+    priority_charge = charges["priority_charge"] if data.isPriority else 0.0
+    total_charge = platform_charge + priority_charge
+    
+    # 4. Create Stripe payment intent if total charge > 0
+    intent_id = None
+    client_secret = None
+    customer_id = None
+    ephemeral_key = None
+    payment_status = PaymentStatus.PENDING
+    initial_status = ServiceStatus.DRAFT
+    priority_expiry = None
+
+    if total_charge > 0:
+        try:
+            customer_id = await get_or_create_stripe_customer(provider_id)
+            ephemeral_key = await create_ephemeral_key(customer_id)
+            intent = await create_payment_intent(
+                amount=total_charge,
+                is_escrow=False,
+                metadata={"provider_id": str(provider_id), "type": "SERVICE_CREATION_FEE"},
+                customer_id=customer_id
+            )
+            intent_id = intent.id
+            client_secret = intent.client_secret
+        except Exception as e:
+            # If Stripe is unconfigured in local development, handle gracefully or raise
+            print(f"Warning: Stripe PaymentIntent creation warning: {e}")
+    else:
+        # Free service creation if charges are $0
+        payment_status = PaymentStatus.PAID
+        initial_status = ServiceStatus.PUBLISHED
+        if data.isPriority:
+            priority_expiry = datetime.now(timezone.utc) + timedelta(hours=24)
+
+    # 5. Create Service in DB
     service = await db.service.create(
         data={
             "title": data.title,
@@ -63,12 +109,108 @@ async def create_service(provider_id: int, data: ServiceCreate):
             "images": data.images,
             "provider": {"connect": {"id": provider_id}},
             "category": category_name,
-            "status": data.status
+            "status": initial_status,
+            "isPriority": data.isPriority,
+            "priorityExpiresAt": priority_expiry,
+            "platformFeePaid": platform_charge,
+            "priorityFeePaid": priority_charge,
+            "totalChargePaid": total_charge,
+            "stripeIntentId": intent_id,
+            "paymentStatus": payment_status
         },
         include={"provider": {"include": {"profile": True}}}
     )
     
-    # Notify Past Clients (who had COMPLETED applications with this provider)
+    # If free / published immediately, notify past clients
+    if initial_status == ServiceStatus.PUBLISHED:
+        from prisma.enums import ApplicationStatus
+        past_clients = await db.serviceapplication.find_many(
+            where={
+                "service": {"providerId": provider_id},
+                "status": ApplicationStatus.COMPLETED
+            },
+            distinct=["clientId"]
+        )
+        from app.modules.notifications.service import send_notification
+        for client in past_clients:
+            await send_notification(
+                user_id=client.clientId,
+                title="New Service from your Provider",
+                description=f"Your previous service provider has created a new service: '{service.title}'",
+                notification_type="new_service",
+                image=service.images[0] if service.images else None
+            )
+
+    return {
+        "service": format_service_response(service),
+        "platform_charge": platform_charge,
+        "priority_charge": priority_charge,
+        "total_charge": total_charge,
+        "client_secret": client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key,
+        "payment_required": total_charge > 0 and payment_status == PaymentStatus.PENDING
+    }
+
+async def confirm_service_payment(provider_id: int, service_id: int):
+    """
+    Confirms upfront Stripe payment for a service, transitioning it to PUBLISHED status.
+    """
+    service = await db.service.find_unique(
+        where={"id": service_id},
+        include={"provider": {"include": {"profile": True}}}
+    )
+    if not service or service.providerId != provider_id:
+        raise HTTPException(status_code=404, detail="Service not found or unauthorized")
+        
+    if service.paymentStatus == PaymentStatus.PAID:
+        return format_service_response(service)
+        
+    if not service.stripeIntentId:
+        raise HTTPException(status_code=400, detail="No payment intent associated with this service")
+        
+    # Verify with Stripe
+    import stripe
+    get_stripe_api_key()
+    try:
+        intent = stripe.PaymentIntent.retrieve(service.stripeIntentId)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
+        
+    if intent.status not in ["succeeded", "processing"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Payment has not succeeded yet (Current status: {intent.status})"
+        )
+        
+    priority_expiry = datetime.now(timezone.utc) + timedelta(hours=24) if service.isPriority else None
+    
+    updated_service = await db.service.update(
+        where={"id": service_id},
+        data={
+            "status": ServiceStatus.PUBLISHED,
+            "paymentStatus": PaymentStatus.PAID,
+            "priorityExpiresAt": priority_expiry
+        },
+        include={"provider": {"include": {"profile": True}}}
+    )
+    
+    # Record transaction in Transaction table
+    try:
+        from prisma.enums import TransactionType, TransactionStatus
+        await db.transaction.create(
+            data={
+                "amount": service.totalChargePaid,
+                "type": TransactionType.PAYMENT,
+                "status": TransactionStatus.COMPLETED,
+                "stripeChargeId": getattr(intent, "latest_charge", None) or intent.id,
+                "userId": provider_id
+            }
+        )
+    except Exception as e:
+        print(f"Warning: Transaction record creation notice: {e}")
+        
+    # Notify Past Clients
     from prisma.enums import ApplicationStatus
     past_clients = await db.serviceapplication.find_many(
         where={
@@ -77,18 +219,18 @@ async def create_service(provider_id: int, data: ServiceCreate):
         },
         distinct=["clientId"]
     )
-    
     from app.modules.notifications.service import send_notification
     for client in past_clients:
         await send_notification(
             user_id=client.clientId,
             title="New Service from your Provider",
-            description=f"Your previous service provider has created a new service: '{service.title}'",
+            description=f"Your previous service provider has published a new service: '{updated_service.title}'",
             notification_type="new_service",
-            image=service.images[0] if service.images else None
+            image=updated_service.images[0] if updated_service.images else None
         )
-    
-    return format_service_response(service)
+        
+    return format_service_response(updated_service)
+
 
 async def get_provider_services(provider_id: int, status_filter: str = "ALL", page: int = 1, page_size: int = 10):
     """

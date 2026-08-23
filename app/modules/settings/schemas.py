@@ -23,3 +23,12 @@ class SettingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ServiceChargesResponse(BaseModel):
+    platform_charge: float
+    priority_charge: float
+
+class ServiceChargesUpdate(BaseModel):
+    platform_charge: Optional[float] = None
+    priority_charge: Optional[float] = None
+
