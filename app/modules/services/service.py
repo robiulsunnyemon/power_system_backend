@@ -112,9 +112,9 @@ async def create_service(provider_id: int, data: ServiceCreate):
             "status": initial_status,
             "isPriority": data.isPriority,
             "priorityExpiresAt": priority_expiry,
-            "platformFeePaid": platform_charge,
-            "priorityFeePaid": priority_charge,
-            "totalChargePaid": total_charge,
+            "platformFeePaid": 0.0,
+            "priorityFeePaid": 0.0,
+            "totalChargePaid": 0.0,
             "stripeIntentId": intent_id,
             "paymentStatus": payment_status
         },
@@ -183,6 +183,12 @@ async def confirm_service_payment(provider_id: int, service_id: int):
             detail=f"Payment has not succeeded yet (Current status: {intent.status})"
         )
         
+    # Calculate charges from intent or settings
+    charges = await get_service_charges()
+    platform_charge = charges["platform_charge"]
+    priority_charge = charges["priority_charge"] if service.isPriority else 0.0
+    amount_paid = (intent.amount / 100.0) if hasattr(intent, "amount") and intent.amount else (platform_charge + priority_charge)
+
     priority_expiry = datetime.now(timezone.utc) + timedelta(hours=24) if service.isPriority else None
     
     updated_service = await db.service.update(
@@ -190,6 +196,9 @@ async def confirm_service_payment(provider_id: int, service_id: int):
         data={
             "status": ServiceStatus.PUBLISHED,
             "paymentStatus": PaymentStatus.PAID,
+            "platformFeePaid": platform_charge,
+            "priorityFeePaid": priority_charge,
+            "totalChargePaid": amount_paid,
             "priorityExpiresAt": priority_expiry
         },
         include={"provider": {"include": {"profile": True}}}
@@ -200,7 +209,7 @@ async def confirm_service_payment(provider_id: int, service_id: int):
         from prisma.enums import TransactionType, TransactionStatus
         await db.transaction.create(
             data={
-                "amount": service.totalChargePaid,
+                "amount": amount_paid,
                 "type": TransactionType.PAYMENT,
                 "status": TransactionStatus.COMPLETED,
                 "stripeChargeId": getattr(intent, "latest_charge", None) or intent.id,
@@ -379,9 +388,13 @@ async def update_service(provider_id: int, service_id: int, data: ServiceUpdate)
 
     charges = await get_service_charges()
 
-    # If service payment is still PENDING and status is being set to PUBLISHED
+    # If service payment is still PENDING
     if service.paymentStatus != PaymentStatus.PAID:
-        if target_status == ServiceStatus.PUBLISHED:
+        # If user explicitly wants to keep/save as DRAFT without publishing:
+        if data.status == ServiceStatus.DRAFT:
+            total_charge = 0.0
+        else:
+            # Publish requested, or updating an unpaid draft
             platform_charge = charges["platform_charge"]
             if target_is_priority:
                 priority_charge = charges["priority_charge"]
@@ -419,15 +432,11 @@ async def update_service(provider_id: int, service_id: int, data: ServiceUpdate)
         except Exception as e:
             print(f"Warning: Stripe PaymentIntent creation warning: {e}")
 
-        # Keep status as DRAFT until payment confirmation
-        if target_status == ServiceStatus.PUBLISHED:
-            update_data["status"] = ServiceStatus.DRAFT
-
+        # Keep status as DRAFT in DB until payment confirmation
+        update_data["status"] = ServiceStatus.DRAFT
         update_data["stripeIntentId"] = intent_id
         update_data["paymentStatus"] = PaymentStatus.PENDING
-        update_data["platformFeePaid"] = service.platformFeePaid + platform_charge
-        update_data["priorityFeePaid"] = service.priorityFeePaid + priority_charge
-        update_data["totalChargePaid"] = (service.totalChargePaid or 0.0) + total_charge
+        update_data["isPriority"] = target_is_priority
     else:
         # If no charge required and target status is PUBLISHED
         if target_status == ServiceStatus.PUBLISHED and service.paymentStatus != PaymentStatus.PAID:
