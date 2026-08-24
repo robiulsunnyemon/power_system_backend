@@ -27,6 +27,7 @@ from .service import (
     create_ephemeral_key
 )
 from app.modules.users.router import get_current_user_id
+from app.modules.settings.service import get_priority_fees
 from app.core.pricing_engine import (
     calculate_platform_fee,
     calculate_protection_fee,
@@ -589,7 +590,10 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
     customer_id = await get_or_create_stripe_customer(current_user_id)
     ephemeral_key = await create_ephemeral_key(customer_id)
 
-    fee_amount = PRODUCT_PRIORITY_FEE
+    fees = await get_priority_fees()
+    fee_amount = fees["product_priority_fee"]
+    duration_hours = fees["priority_duration_hours"]
+
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
@@ -601,7 +605,7 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
         }
     )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
     updated_product = await db.product.update(
         where={"id": product.id},
         data={
@@ -612,7 +616,7 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
 
     return {
         "status": "success",
-        "message": f"Product boosted to Priority for {PRIORITY_DURATION_HOURS} hours",
+        "message": f"Product boosted to Priority for {duration_hours} hours",
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),
@@ -632,7 +636,10 @@ async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_
     customer_id = await get_or_create_stripe_customer(current_user_id)
     ephemeral_key = await create_ephemeral_key(customer_id)
 
-    fee_amount = SERVICE_PRIORITY_FEE
+    fees = await get_priority_fees()
+    fee_amount = fees["service_priority_fee"]
+    duration_hours = fees["priority_duration_hours"]
+
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
@@ -644,7 +651,7 @@ async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_
         }
     )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
     updated_service = await db.service.update(
         where={"id": service.id},
         data={
@@ -655,7 +662,7 @@ async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_
 
     return {
         "status": "success",
-        "message": f"Service boosted to Priority for {PRIORITY_DURATION_HOURS} hours",
+        "message": f"Service boosted to Priority for {duration_hours} hours",
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),
@@ -675,7 +682,10 @@ async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_
     customer_id = await get_or_create_stripe_customer(current_user_id)
     ephemeral_key = await create_ephemeral_key(customer_id)
 
-    fee_amount = URGENT_JOB_PRIORITY_FEE
+    fees = await get_priority_fees()
+    fee_amount = fees["urgent_job_priority_fee"]
+    duration_hours = fees["priority_duration_hours"]
+
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
@@ -687,7 +697,7 @@ async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_
         }
     )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=PRIORITY_DURATION_HOURS)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
     await db.serviceapplication.update(
         where={"id": service_app.id},
         data={
@@ -705,7 +715,7 @@ async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_
 
     return {
         "status": "success",
-        "message": f"Job boosted to Urgent Priority ($10) for {PRIORITY_DURATION_HOURS} hours",
+        "message": f"Job boosted to Urgent Priority for {duration_hours} hours",
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),

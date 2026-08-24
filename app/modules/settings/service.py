@@ -164,3 +164,83 @@ async def update_service_charges(data):
 
     return await get_service_charges()
 
+async def get_priority_fees():
+    """
+    Public: Fetches the configured priority boost fees for products, services, and urgent jobs.
+    Defaults:
+      product_priority_fee = 5.0
+      service_priority_fee = 5.0
+      urgent_job_priority_fee = 10.0
+      priority_duration_hours = 24
+    """
+    prod_setting = await db.setting.find_unique(where={"title": SettingType.PRODUCT_PRIORITY_FEE})
+    srv_setting = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
+    urgent_setting = await db.setting.find_unique(where={"title": SettingType.URGENT_JOB_PRIORITY_FEE})
+    duration_setting = await db.setting.find_unique(where={"title": SettingType.PRIORITY_DURATION_HOURS})
+
+    try:
+        product_fee = float(prod_setting.content) if prod_setting and prod_setting.content else 5.0
+    except (ValueError, TypeError):
+        product_fee = 5.0
+
+    try:
+        service_fee = float(srv_setting.content) if srv_setting and srv_setting.content else 5.0
+    except (ValueError, TypeError):
+        service_fee = 5.0
+
+    try:
+        urgent_job_fee = float(urgent_setting.content) if urgent_setting and urgent_setting.content else 10.0
+    except (ValueError, TypeError):
+        urgent_job_fee = 10.0
+
+    try:
+        duration_hours = int(duration_setting.content) if duration_setting and duration_setting.content else 24
+    except (ValueError, TypeError):
+        duration_hours = 24
+
+    return {
+        "product_priority_fee": product_fee,
+        "service_priority_fee": service_fee,
+        "urgent_job_priority_fee": urgent_job_fee,
+        "priority_duration_hours": duration_hours
+    }
+
+async def update_priority_fees(data):
+    """
+    Admin only: Updates or creates the priority fee settings.
+    """
+    if data.product_priority_fee is not None:
+        val = str(data.product_priority_fee)
+        existing = await db.setting.find_unique(where={"title": SettingType.PRODUCT_PRIORITY_FEE})
+        if existing:
+            await db.setting.update(where={"id": existing.id}, data={"content": val})
+        else:
+            await db.setting.create(data={"title": SettingType.PRODUCT_PRIORITY_FEE, "content": val})
+
+    if data.service_priority_fee is not None:
+        val = str(data.service_priority_fee)
+        existing = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
+        if existing:
+            await db.setting.update(where={"id": existing.id}, data={"content": val})
+        else:
+            await db.setting.create(data={"title": SettingType.SERVICE_PRIORITY_CHARGE, "content": val})
+
+    if data.urgent_job_priority_fee is not None:
+        val = str(data.urgent_job_priority_fee)
+        existing = await db.setting.find_unique(where={"title": SettingType.URGENT_JOB_PRIORITY_FEE})
+        if existing:
+            await db.setting.update(where={"id": existing.id}, data={"content": val})
+        else:
+            await db.setting.create(data={"title": SettingType.URGENT_JOB_PRIORITY_FEE, "content": val})
+
+    if data.priority_duration_hours is not None:
+        val = str(data.priority_duration_hours)
+        existing = await db.setting.find_unique(where={"title": SettingType.PRIORITY_DURATION_HOURS})
+        if existing:
+            await db.setting.update(where={"id": existing.id}, data={"content": val})
+        else:
+            await db.setting.create(data={"title": SettingType.PRIORITY_DURATION_HOURS, "content": val})
+
+    return await get_priority_fees()
+
+

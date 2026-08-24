@@ -74,6 +74,23 @@ async def update_service_charges_endpoint(
     """
     return await service.update_service_charges(data)
 
+@router.get("/priority-fees", response_model=schemas.PriorityFeesResponse)
+async def get_priority_fees_endpoint():
+    """
+    Public: Get current priority boost fees for products, services, and urgent jobs, plus duration in hours.
+    """
+    return await service.get_priority_fees()
+
+@router.put("/priority-fees", response_model=schemas.PriorityFeesResponse)
+async def update_priority_fees_endpoint(
+    data: schemas.PriorityFeesUpdate,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin only: Update priority boost fees for products, services, and urgent jobs, plus duration in hours.
+    """
+    return await service.update_priority_fees(data)
+
 @router.delete("/{setting_id}")
 async def delete_setting(
     setting_id: int,
