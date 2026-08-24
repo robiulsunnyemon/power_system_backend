@@ -34,6 +34,7 @@ class ServiceUpdate(BaseModel):
     availability: Optional[List[str]] = None
     images: Optional[List[str]] = None
     status: Optional[ServiceStatus] = None
+    isPriority: Optional[bool] = None
 
 class ServiceResponse(BaseModel):
     id: int

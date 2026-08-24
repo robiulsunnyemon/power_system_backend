@@ -105,7 +105,7 @@ async def get_service_by_id_endpoint(
 ):
     return await get_service_by_id(service_id)
 
-@router.patch("/{service_id}", response_model=ServiceResponse,status_code=status.HTTP_200_OK)
+@router.patch("/{service_id}", response_model=ServiceCreationPaymentResponse, status_code=status.HTTP_200_OK)
 async def update_service_endpoint(
     data: ServiceUpdate,
     service_id: int = Path(..., title="The ID of the service to update"),

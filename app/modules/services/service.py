@@ -347,8 +347,13 @@ async def get_service_by_id(service_id: int):
 async def update_service(provider_id: int, service_id: int, data: ServiceUpdate):
     """
     Updates an existing service.
+    If publishing a draft or enabling priority when payment is pending, creates a Stripe PaymentIntent
+    and returns client_secret, customer_id, and ephemeral_key for Stripe PaymentSheet.
     """
-    service = await db.service.find_unique(where={"id": service_id})
+    service = await db.service.find_unique(
+        where={"id": service_id},
+        include={"provider": {"include": {"profile": True}}}
+    )
     
     if not service or service.providerId != provider_id:
         raise HTTPException(status_code=404, detail="Service not found or access denied")
@@ -364,13 +369,89 @@ async def update_service(provider_id: int, service_id: int, data: ServiceUpdate)
     if "availability" in update_data and update_data["availability"]:
         update_data["availability"] = Json(update_data["availability"])
 
+    # Determine target priority and status
+    target_is_priority = data.isPriority if data.isPriority is not None else service.isPriority
+    target_status = data.status if data.status is not None else service.status
+
+    platform_charge = 0.0
+    priority_charge = 0.0
+    total_charge = 0.0
+
+    charges = await get_service_charges()
+
+    # If service payment is still PENDING and status is being set to PUBLISHED
+    if service.paymentStatus != PaymentStatus.PAID:
+        if target_status == ServiceStatus.PUBLISHED:
+            platform_charge = charges["platform_charge"]
+            if target_is_priority:
+                priority_charge = charges["priority_charge"]
+            total_charge = platform_charge + priority_charge
+    else:
+        # If service was already PAID, but now newly enabling priority
+        if target_is_priority and not service.isPriority:
+            priority_charge = charges["priority_charge"]
+            total_charge = priority_charge
+
+    # Stripe credentials for PaymentSheet
+    intent_id = None
+    client_secret = None
+    customer_id = None
+    ephemeral_key = None
+    payment_required = False
+
+    if total_charge > 0:
+        payment_required = True
+        try:
+            customer_id = await get_or_create_stripe_customer(provider_id)
+            ephemeral_key = await create_ephemeral_key(customer_id)
+            intent = await create_payment_intent(
+                amount=total_charge,
+                is_escrow=False,
+                metadata={
+                    "provider_id": str(provider_id),
+                    "service_id": str(service_id),
+                    "type": "SERVICE_CREATION_FEE"
+                },
+                customer_id=customer_id
+            )
+            intent_id = intent.id
+            client_secret = intent.client_secret
+        except Exception as e:
+            print(f"Warning: Stripe PaymentIntent creation warning: {e}")
+
+        # Keep status as DRAFT until payment confirmation
+        if target_status == ServiceStatus.PUBLISHED:
+            update_data["status"] = ServiceStatus.DRAFT
+
+        update_data["stripeIntentId"] = intent_id
+        update_data["paymentStatus"] = PaymentStatus.PENDING
+        update_data["platformFeePaid"] = service.platformFeePaid + platform_charge
+        update_data["priorityFeePaid"] = service.priorityFeePaid + priority_charge
+        update_data["totalChargePaid"] = (service.totalChargePaid or 0.0) + total_charge
+    else:
+        # If no charge required and target status is PUBLISHED
+        if target_status == ServiceStatus.PUBLISHED and service.paymentStatus != PaymentStatus.PAID:
+            update_data["status"] = ServiceStatus.PUBLISHED
+            update_data["paymentStatus"] = PaymentStatus.PAID
+            if target_is_priority:
+                update_data["priorityExpiresAt"] = datetime.now(timezone.utc) + timedelta(hours=24)
+
     updated_service = await db.service.update(
         where={"id": service_id},
         data=update_data, # type: ignore
         include={"provider": {"include": {"profile": True}}}
     )
     
-    return format_service_response(updated_service)
+    return {
+        "service": format_service_response(updated_service),
+        "platform_charge": platform_charge,
+        "priority_charge": priority_charge,
+        "total_charge": total_charge,
+        "client_secret": client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key,
+        "payment_required": payment_required
+    }
 
 async def delete_service(provider_id: int, service_id: int):
     """
