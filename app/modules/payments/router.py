@@ -586,14 +586,18 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
     if product.sellerId != current_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to boost this product")
 
+    customer_id = await get_or_create_stripe_customer(current_user_id)
+    ephemeral_key = await create_ephemeral_key(customer_id)
+
     fee_amount = PRODUCT_PRIORITY_FEE
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
+        customer_id=customer_id,
         metadata={
             "type": "PRODUCT_PRIORITY_BOOST",
-            "product_id": product.id,
-            "seller_id": current_user_id
+            "product_id": str(product.id),
+            "seller_id": str(current_user_id)
         }
     )
 
@@ -612,7 +616,9 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.get("client_secret")
+        "client_secret": intent.client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key
     }
 
 @router.post("/priority/service")
@@ -623,14 +629,18 @@ async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_
     if service.providerId != current_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to boost this service")
 
+    customer_id = await get_or_create_stripe_customer(current_user_id)
+    ephemeral_key = await create_ephemeral_key(customer_id)
+
     fee_amount = SERVICE_PRIORITY_FEE
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
+        customer_id=customer_id,
         metadata={
             "type": "SERVICE_PRIORITY_BOOST",
-            "service_id": service.id,
-            "provider_id": current_user_id
+            "service_id": str(service.id),
+            "provider_id": str(current_user_id)
         }
     )
 
@@ -649,7 +659,9 @@ async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.get("client_secret")
+        "client_secret": intent.client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key
     }
 
 @router.post("/priority/urgent-job")
@@ -660,14 +672,18 @@ async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_
     if service_app.clientId != current_user_id:
         raise HTTPException(status_code=403, detail="Not authorized to boost this application")
 
+    customer_id = await get_or_create_stripe_customer(current_user_id)
+    ephemeral_key = await create_ephemeral_key(customer_id)
+
     fee_amount = URGENT_JOB_PRIORITY_FEE
     intent = await create_payment_intent(
         amount=fee_amount,
         currency="usd",
+        customer_id=customer_id,
         metadata={
             "type": "URGENT_JOB_PRIORITY_BOOST",
-            "service_application_id": service_app.id,
-            "client_id": current_user_id
+            "service_application_id": str(service_app.id),
+            "client_id": str(current_user_id)
         }
     )
 
@@ -693,7 +709,9 @@ async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_
         "fee_charged": fee_amount,
         "isPriority": True,
         "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.get("client_secret")
+        "client_secret": intent.client_secret,
+        "customer_id": customer_id,
+        "ephemeral_key": ephemeral_key
     }
 
 @router.post("/refund")
