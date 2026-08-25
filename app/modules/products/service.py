@@ -213,7 +213,7 @@ async def get_all_products(
     products = await db.product.find_many(
         where=query,
         include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
-        order=[{"isPriority": "desc"}, {"createdAt": "desc"}],
+        order=[{"isPriority": "desc"}, {"priorityExpiresAt": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )
@@ -291,7 +291,7 @@ async def search_products(
     products = await db.product.find_many(
         where=query,
         include={"category": True, "seller": {"include": {"profile": True, "reviews_received": True}}},
-        order={"createdAt": "desc"},
+        order=[{"isPriority": "desc"}, {"priorityExpiresAt": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )

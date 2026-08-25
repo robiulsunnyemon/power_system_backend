@@ -327,7 +327,7 @@ async def get_all_services(
     services = await db.service.find_many(
         where=query,
         include={"provider": {"include": {"profile": True}}},
-        order=[{"isPriority": "desc"}, {"createdAt": "desc"}],
+        order=[{"isPriority": "desc"}, {"priorityExpiresAt": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )
@@ -529,7 +529,7 @@ async def search_services(
     services = await db.service.find_many(
         where=query,
         include={"provider": {"include": {"profile": True}}},
-        order={"createdAt": "desc"},
+        order=[{"isPriority": "desc"}, {"priorityExpiresAt": "desc"}, {"createdAt": "desc"}],
         skip=skip,
         take=page_size
     )
