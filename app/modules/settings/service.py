@@ -173,30 +173,38 @@ async def get_priority_fees():
       urgent_job_priority_fee = 10.0
       priority_duration_hours = 24
     """
-    prod_setting = await db.setting.find_unique(where={"title": SettingType.PRODUCT_PRIORITY_FEE})
-    srv_setting = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
-    urgent_setting = await db.setting.find_unique(where={"title": SettingType.URGENT_JOB_PRIORITY_FEE})
-    duration_setting = await db.setting.find_unique(where={"title": SettingType.PRIORITY_DURATION_HOURS})
+    product_fee = 5.0
+    service_fee = 5.0
+    urgent_job_fee = 10.0
+    duration_hours = 24
 
     try:
-        product_fee = float(prod_setting.content) if prod_setting and prod_setting.content else 5.0
-    except (ValueError, TypeError):
-        product_fee = 5.0
+        prod_setting = await db.setting.find_unique(where={"title": SettingType.PRODUCT_PRIORITY_FEE})
+        if prod_setting and prod_setting.content:
+            product_fee = float(prod_setting.content)
+    except Exception:
+        pass
 
     try:
-        service_fee = float(srv_setting.content) if srv_setting and srv_setting.content else 5.0
-    except (ValueError, TypeError):
-        service_fee = 5.0
+        srv_setting = await db.setting.find_unique(where={"title": SettingType.SERVICE_PRIORITY_CHARGE})
+        if srv_setting and srv_setting.content:
+            service_fee = float(srv_setting.content)
+    except Exception:
+        pass
 
     try:
-        urgent_job_fee = float(urgent_setting.content) if urgent_setting and urgent_setting.content else 10.0
-    except (ValueError, TypeError):
-        urgent_job_fee = 10.0
+        urgent_setting = await db.setting.find_unique(where={"title": SettingType.URGENT_JOB_PRIORITY_FEE})
+        if urgent_setting and urgent_setting.content:
+            urgent_job_fee = float(urgent_setting.content)
+    except Exception:
+        pass
 
     try:
-        duration_hours = int(duration_setting.content) if duration_setting and duration_setting.content else 24
-    except (ValueError, TypeError):
-        duration_hours = 24
+        duration_setting = await db.setting.find_unique(where={"title": SettingType.PRIORITY_DURATION_HOURS})
+        if duration_setting and duration_setting.content:
+            duration_hours = int(duration_setting.content)
+    except Exception:
+        pass
 
     return {
         "product_priority_fee": product_fee,

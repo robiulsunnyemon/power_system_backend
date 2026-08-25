@@ -581,148 +581,163 @@ async def get_stripe_login_link(current_user_id: int = Depends(get_current_user_
 
 @router.post("/priority/product")
 async def priority_boost_product(req: PriorityBoostProductRequest, current_user_id: int = Depends(get_current_user_id)):
-    product = await db.product.find_unique(where={"id": req.product_id})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    if product.sellerId != current_user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to boost this product")
+    try:
+        product = await db.product.find_unique(where={"id": req.product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        if product.sellerId != current_user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to boost this product")
 
-    customer_id = await get_or_create_stripe_customer(current_user_id)
-    ephemeral_key = await create_ephemeral_key(customer_id)
+        customer_id = await get_or_create_stripe_customer(current_user_id)
+        ephemeral_key = await create_ephemeral_key(customer_id)
 
-    fees = await get_priority_fees()
-    fee_amount = fees["product_priority_fee"]
-    duration_hours = fees["priority_duration_hours"]
+        fees = await get_priority_fees()
+        fee_amount = fees.get("product_priority_fee", 5.0)
+        duration_hours = fees.get("priority_duration_hours", 24)
 
-    intent = await create_payment_intent(
-        amount=fee_amount,
-        currency="usd",
-        customer_id=customer_id,
-        metadata={
-            "type": "PRODUCT_PRIORITY_BOOST",
-            "product_id": str(product.id),
-            "seller_id": str(current_user_id)
-        }
-    )
+        intent = await create_payment_intent(
+            amount=fee_amount,
+            currency="usd",
+            customer_id=customer_id,
+            metadata={
+                "type": "PRODUCT_PRIORITY_BOOST",
+                "product_id": str(product.id),
+                "seller_id": str(current_user_id)
+            }
+        )
 
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
-    updated_product = await db.product.update(
-        where={"id": product.id},
-        data={
-            "isPriority": True,
-            "priorityExpiresAt": expires_at
-        }
-    )
-
-    return {
-        "status": "success",
-        "message": f"Product boosted to Priority for {duration_hours} hours",
-        "fee_charged": fee_amount,
-        "isPriority": True,
-        "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.client_secret,
-        "customer_id": customer_id,
-        "ephemeral_key": ephemeral_key
-    }
-
-@router.post("/priority/service")
-async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_id: int = Depends(get_current_user_id)):
-    service = await db.service.find_unique(where={"id": req.service_id})
-    if not service:
-        raise HTTPException(status_code=404, detail="Service not found")
-    if service.providerId != current_user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to boost this service")
-
-    customer_id = await get_or_create_stripe_customer(current_user_id)
-    ephemeral_key = await create_ephemeral_key(customer_id)
-
-    fees = await get_priority_fees()
-    fee_amount = fees["service_priority_fee"]
-    duration_hours = fees["priority_duration_hours"]
-
-    intent = await create_payment_intent(
-        amount=fee_amount,
-        currency="usd",
-        customer_id=customer_id,
-        metadata={
-            "type": "SERVICE_PRIORITY_BOOST",
-            "service_id": str(service.id),
-            "provider_id": str(current_user_id)
-        }
-    )
-
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
-    updated_service = await db.service.update(
-        where={"id": service.id},
-        data={
-            "isPriority": True,
-            "priorityExpiresAt": expires_at
-        }
-    )
-
-    return {
-        "status": "success",
-        "message": f"Service boosted to Priority for {duration_hours} hours",
-        "fee_charged": fee_amount,
-        "isPriority": True,
-        "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.client_secret,
-        "customer_id": customer_id,
-        "ephemeral_key": ephemeral_key
-    }
-
-@router.post("/priority/urgent-job")
-async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_user_id: int = Depends(get_current_user_id)):
-    service_app = await db.serviceapplication.find_unique(where={"id": req.service_application_id})
-    if not service_app:
-        raise HTTPException(status_code=404, detail="Service application not found")
-    if service_app.clientId != current_user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to boost this application")
-
-    customer_id = await get_or_create_stripe_customer(current_user_id)
-    ephemeral_key = await create_ephemeral_key(customer_id)
-
-    fees = await get_priority_fees()
-    fee_amount = fees["urgent_job_priority_fee"]
-    duration_hours = fees["priority_duration_hours"]
-
-    intent = await create_payment_intent(
-        amount=fee_amount,
-        currency="usd",
-        customer_id=customer_id,
-        metadata={
-            "type": "URGENT_JOB_PRIORITY_BOOST",
-            "service_application_id": str(service_app.id),
-            "client_id": str(current_user_id)
-        }
-    )
-
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
-    await db.serviceapplication.update(
-        where={"id": service_app.id},
-        data={
-            "isEscrow": True
-        }
-    )
-    if service_app.serviceId:
-        await db.service.update(
-            where={"id": service_app.serviceId},
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
+        updated_product = await db.product.update(
+            where={"id": product.id},
             data={
                 "isPriority": True,
                 "priorityExpiresAt": expires_at
             }
         )
 
-    return {
-        "status": "success",
-        "message": f"Job boosted to Urgent Priority for {duration_hours} hours",
-        "fee_charged": fee_amount,
-        "isPriority": True,
-        "priorityExpiresAt": expires_at.isoformat(),
-        "client_secret": intent.client_secret,
-        "customer_id": customer_id,
-        "ephemeral_key": ephemeral_key
-    }
+        return {
+            "status": "success",
+            "message": f"Product boosted to Priority for {duration_hours} hours",
+            "fee_charged": fee_amount,
+            "isPriority": True,
+            "priorityExpiresAt": expires_at.isoformat(),
+            "client_secret": intent.client_secret,
+            "customer_id": customer_id,
+            "ephemeral_key": ephemeral_key
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Priority boost failed: {str(e)}")
+
+@router.post("/priority/service")
+async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_id: int = Depends(get_current_user_id)):
+    try:
+        service = await db.service.find_unique(where={"id": req.service_id})
+        if not service:
+            raise HTTPException(status_code=404, detail="Service not found")
+        if service.providerId != current_user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to boost this service")
+
+        customer_id = await get_or_create_stripe_customer(current_user_id)
+        ephemeral_key = await create_ephemeral_key(customer_id)
+
+        fees = await get_priority_fees()
+        fee_amount = fees.get("service_priority_fee", 5.0)
+        duration_hours = fees.get("priority_duration_hours", 24)
+
+        intent = await create_payment_intent(
+            amount=fee_amount,
+            currency="usd",
+            customer_id=customer_id,
+            metadata={
+                "type": "SERVICE_PRIORITY_BOOST",
+                "service_id": str(service.id),
+                "provider_id": str(current_user_id)
+            }
+        )
+
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
+        updated_service = await db.service.update(
+            where={"id": service.id},
+            data={
+                "isPriority": True,
+                "priorityExpiresAt": expires_at
+            }
+        )
+
+        return {
+            "status": "success",
+            "message": f"Service boosted to Priority for {duration_hours} hours",
+            "fee_charged": fee_amount,
+            "isPriority": True,
+            "priorityExpiresAt": expires_at.isoformat(),
+            "client_secret": intent.client_secret,
+            "customer_id": customer_id,
+            "ephemeral_key": ephemeral_key
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Priority boost failed: {str(e)}")
+
+@router.post("/priority/urgent-job")
+async def priority_boost_urgent_job(req: PriorityBoostUrgentJobRequest, current_user_id: int = Depends(get_current_user_id)):
+    try:
+        service_app = await db.serviceapplication.find_unique(where={"id": req.service_application_id})
+        if not service_app:
+            raise HTTPException(status_code=404, detail="Service application not found")
+        if service_app.clientId != current_user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to boost this application")
+
+        customer_id = await get_or_create_stripe_customer(current_user_id)
+        ephemeral_key = await create_ephemeral_key(customer_id)
+
+        fees = await get_priority_fees()
+        fee_amount = fees.get("urgent_job_priority_fee", 10.0)
+        duration_hours = fees.get("priority_duration_hours", 24)
+
+        intent = await create_payment_intent(
+            amount=fee_amount,
+            currency="usd",
+            customer_id=customer_id,
+            metadata={
+                "type": "URGENT_JOB_PRIORITY_BOOST",
+                "service_application_id": str(service_app.id),
+                "client_id": str(current_user_id)
+            }
+        )
+
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
+        await db.serviceapplication.update(
+            where={"id": service_app.id},
+            data={
+                "isEscrow": True
+            }
+        )
+        if service_app.serviceId:
+            await db.service.update(
+                where={"id": service_app.serviceId},
+                data={
+                    "isPriority": True,
+                    "priorityExpiresAt": expires_at
+                }
+            )
+
+        return {
+            "status": "success",
+            "message": f"Job boosted to Urgent Priority for {duration_hours} hours",
+            "fee_charged": fee_amount,
+            "isPriority": True,
+            "priorityExpiresAt": expires_at.isoformat(),
+            "client_secret": intent.client_secret,
+            "customer_id": customer_id,
+            "ephemeral_key": ephemeral_key
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Priority boost failed: {str(e)}")
 
 @router.post("/refund")
 async def process_refund(req: RefundRequest, current_user_id: int = Depends(get_current_user_id)):

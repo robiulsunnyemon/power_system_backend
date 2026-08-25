@@ -29,34 +29,6 @@ async def list_settings(
     """
     return await service.get_settings(title)
 
-@router.get("/{setting_id}", response_model=schemas.SettingResponse)
-async def get_setting(setting_id: int):
-    """
-    Public: Get a specific setting by ID.
-    """
-    return await service.get_setting_by_id(setting_id)
-
-@router.put("/maintenance", response_model=schemas.SettingResponse)
-async def toggle_maintenance_mode(
-    data: schemas.MaintenanceModeToggle,
-    admin=Depends(get_current_admin)
-):
-    """
-    Admin only: Turn maintenance mode on or off.
-    """
-    return await service.toggle_maintenance_mode(data)
-
-@router.put("/{setting_id}", response_model=schemas.SettingResponse)
-async def update_setting(
-    setting_id: int,
-    data: schemas.SettingUpdate,
-    admin=Depends(get_current_admin)
-):
-    """
-    Admin only: Update an existing setting.
-    """
-    return await service.update_setting(setting_id, data)
-
 @router.get("/service-charges", response_model=schemas.ServiceChargesResponse)
 async def get_service_charges_endpoint():
     """
@@ -90,6 +62,34 @@ async def update_priority_fees_endpoint(
     Admin only: Update priority boost fees for products, services, and urgent jobs, plus duration in hours.
     """
     return await service.update_priority_fees(data)
+
+@router.put("/maintenance", response_model=schemas.SettingResponse)
+async def toggle_maintenance_mode(
+    data: schemas.MaintenanceModeToggle,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin only: Turn maintenance mode on or off.
+    """
+    return await service.toggle_maintenance_mode(data)
+
+@router.get("/{setting_id}", response_model=schemas.SettingResponse)
+async def get_setting(setting_id: int):
+    """
+    Public: Get a specific setting by ID.
+    """
+    return await service.get_setting_by_id(setting_id)
+
+@router.put("/{setting_id}", response_model=schemas.SettingResponse)
+async def update_setting(
+    setting_id: int,
+    data: schemas.SettingUpdate,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin only: Update an existing setting.
+    """
+    return await service.update_setting(setting_id, data)
 
 @router.delete("/{setting_id}")
 async def delete_setting(
