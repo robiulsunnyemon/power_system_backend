@@ -66,6 +66,9 @@ model User {
   paymentMethods          SavedPaymentMethod[]
   transactions            Transaction[]
 
+  disputesInitiated       Dispute[] @relation("DisputeInitiator")
+  disputesReceived        Dispute[] @relation("DisputeRespondent")
+
   @@map("users")
 }
 
@@ -236,6 +239,7 @@ model Order {
   tracking         OrderTracking[]
   review           Review?
   transactions     Transaction[]
+  disputes         Dispute[]
 
   @@map("orders")
 }
@@ -394,6 +398,7 @@ model ServiceApplication {
 
   tracking          ApplicationTracking[]
   review            ServiceReview?
+  disputes          Dispute[]
 
   @@map("service_applications")
 }
@@ -637,3 +642,53 @@ model Transaction {
 
   @@map("transactions")
 }
+
+enum DisputeType {
+  ORDER
+  SERVICE
+}
+
+enum DisputeReason {
+  ITEM_NOT_RECEIVED
+  ITEM_NOT_AS_DESCRIBED
+  SERVICE_NOT_RENDERED
+  POOR_SERVICE_QUALITY
+  UNAUTHORIZED_CHARGE
+  OTHER
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_BUYER_REFUNDED
+  RESOLVED_SELLER_PAID
+  REJECTED
+}
+
+model Dispute {
+  id                    Int           @id @default(autoincrement())
+  disputeType           DisputeType
+  reason                DisputeReason
+  description           String        @db.Text
+  evidenceImages        String[]
+  status                DisputeStatus @default(OPEN)
+  adminNotes            String?       @db.Text
+  
+  orderId               Int?
+  order                 Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  serviceApplicationId  Int?
+  serviceApplication    ServiceApplication? @relation(fields: [serviceApplicationId], references: [id], onDelete: Cascade)
+  
+  initiatorId           Int
+  initiator             User          @relation("DisputeInitiator", fields: [initiatorId], references: [id], onDelete: Cascade)
+  
+  respondentId          Int
+  respondent            User          @relation("DisputeRespondent", fields: [respondentId], references: [id], onDelete: Cascade)
+  
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  @@map("disputes")
+}
+

@@ -82,3 +82,144 @@ async def get_user_chat_history(
     Endpoint for admin to get chat history between any two users with pagination.
     """
     return await service.get_user_chat_history(user1_id, user2_id, page, page_size)
+
+
+# =========================================================================
+# 1. Admin Payment Monitoring & Financial Analytics
+# =========================================================================
+
+@router.get("/payments/overview", response_model=schemas.PaymentOverviewResponse)
+async def get_payment_overview(
+    period: str = Query("monthly", pattern="^(weekly|monthly)$"),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Get comprehensive platform payment metrics, revenue streams, and timeline.
+    """
+    return await service.get_payment_overview(period)
+
+
+# =========================================================================
+# 2. Admin Transaction Management
+# =========================================================================
+
+@router.get("/transactions", response_model=schemas.PaginatedTransactionResponse)
+async def list_transactions(
+    type: schemas.TransactionType = None,
+    status: schemas.TransactionStatus = None,
+    search: str = Query(None, description="Search by user name, email, or Stripe charge ID"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: View and filter all transactions across products and services with pagination.
+    """
+    return await service.get_all_transactions(
+        type_filter=type,
+        status_filter=status,
+        search=search,
+        page=page,
+        page_size=page_size
+    )
+
+@router.get("/transactions/{transaction_id}", response_model=schemas.TransactionItem)
+async def get_transaction(
+    transaction_id: int,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Get single transaction details by ID.
+    """
+    return await service.get_transaction_by_id(transaction_id)
+
+
+# =========================================================================
+# 3. Admin Refund Management
+# =========================================================================
+
+@router.get("/refunds", response_model=schemas.PaginatedRefundResponse)
+async def list_refunds(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: List all refund transactions across the platform.
+    """
+    return await service.get_all_refunds(page, page_size)
+
+@router.post("/refunds/process")
+async def process_refund_endpoint(
+    data: schemas.AdminProcessRefundRequest,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Execute an authoritative refund for an order or service application.
+    """
+    return await service.admin_process_refund(
+        order_id=data.order_id,
+        service_application_id=data.service_application_id,
+        amount=data.amount,
+        reason=data.reason,
+        admin_id=admin.id
+    )
+
+
+# =========================================================================
+# 4. Admin Escrow Release Controls
+# =========================================================================
+
+@router.get("/escrow/list", response_model=schemas.PaginatedEscrowListResponse)
+async def list_escrow_holds(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: List all active escrow holds for orders and services.
+    """
+    return await service.get_escrow_hold_list(page, page_size)
+
+@router.post("/escrow/order/{order_id}/force-release")
+async def force_release_order_escrow(
+    order_id: int,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Force release escrow payment of an order directly to the seller.
+    """
+    return await service.admin_force_release_order_escrow(order_id, admin_id=admin.id)
+
+@router.post("/escrow/order/{order_id}/force-refund")
+async def force_refund_order_escrow(
+    order_id: int,
+    data: schemas.AdminEscrowActionRequest = schemas.AdminEscrowActionRequest(),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Force cancel escrow and refund the buyer for an order.
+    """
+    return await service.admin_force_refund_order_escrow(order_id, reason=data.reason, admin_id=admin.id)
+
+@router.post("/escrow/service/{service_application_id}/force-release")
+async def force_release_service_escrow(
+    service_application_id: int,
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Force release escrow payment of a service application to the service provider.
+    """
+    return await service.admin_force_release_service_escrow(service_application_id, admin_id=admin.id)
+
+@router.post("/escrow/service/{service_application_id}/force-refund")
+async def force_refund_service_escrow(
+    service_application_id: int,
+    data: schemas.AdminEscrowActionRequest = schemas.AdminEscrowActionRequest(),
+    admin=Depends(get_current_admin)
+):
+    """
+    Admin: Force cancel escrow and refund the client for a service application.
+    """
+    return await service.admin_force_refund_service_escrow(service_application_id, reason=data.reason, admin_id=admin.id)
+

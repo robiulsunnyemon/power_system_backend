@@ -19,6 +19,7 @@ from app.modules.articles.router import router as articles_router
 from app.modules.message_reports.router import router as message_report_router
 from app.modules.service_review.router import router as service_review_router
 from app.modules.payments.router import router as payments_router
+from app.modules.disputes.router import router as disputes_router
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -67,6 +68,7 @@ app.include_router(articles_router)
 app.include_router(message_report_router)
 app.include_router(service_review_router)
 app.include_router(payments_router)
+app.include_router(disputes_router)
 
 @app.get("/")
 async def root():
