@@ -93,6 +93,9 @@ async def get_dashboard_stats():
     active_new_this_month = await db.user.count(where={"accountStatus": AccountStatus.ACTIVE, "createdAt": {"gte": first_day_this_month}})
     active_new_last_month = await db.user.count(where={"accountStatus": AccountStatus.ACTIVE, "createdAt": {"gte": first_day_last_month, "lte": last_day_last_month}})
 
+    pending_new_this_month = await db.user.count(where={"accountStatus": AccountStatus.PENDING, "createdAt": {"gte": first_day_this_month}})
+    pending_new_last_month = await db.user.count(where={"accountStatus": AccountStatus.PENDING, "createdAt": {"gte": first_day_last_month, "lte": last_day_last_month}})
+
     # Financial Stats (Product Orders + Service Applications)
     paid_orders = await db.order.find_many(where={"paymentStatus": "PAID"})
     paid_services = await db.serviceapplication.find_many(where={"paymentStatus": "PAID"})
