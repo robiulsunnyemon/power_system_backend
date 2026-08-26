@@ -23,7 +23,6 @@ var/
 .installed.cfg
 *.egg
 .idea/
-.vscode/
 .pytest_cache/
 .coverage
 htmlcov/
@@ -31,3 +30,7 @@ htmlcov/
 generated/
 *.iml
 firebase_credentials.json
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore
