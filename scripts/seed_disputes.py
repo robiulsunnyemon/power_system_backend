@@ -504,7 +504,7 @@ async def seed_disputes():
         for data in disputes_data:
             dispute = await db.dispute.create(data=data)
             created_count += 1
-            print(f"  [+] Dispute #{dispute.id} ({dispute.disputeType.name} - {dispute.status.name}) created")
+            print(f"  [+] Dispute #{dispute.id} ({dispute.disputeType} - {dispute.status}) created")
 
         print(f"\n[OK] Successfully created {created_count} demo disputes!")
 
