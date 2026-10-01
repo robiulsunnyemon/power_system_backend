@@ -241,6 +241,17 @@ async def release_escrow(order_id: int, current_user_id: int = Depends(get_curre
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
+    current_user = await db.user.find_unique(where={"id": current_user_id})
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    is_admin = "ADMIN" in (current_user.roles or [])
+    if order.userId != current_user_id and not is_admin:
+        raise HTTPException(
+            status_code=403, 
+            detail="Not authorized: Only the buyer who placed this order or an admin can release escrow"
+        )
+
     if order.paymentStatus == PaymentStatus.PAID:
         return {"message": "Order payment has already been released", "order": order}
         
@@ -281,6 +292,17 @@ async def release_service_escrow(service_application_id: int, current_user_id: i
     if not service_app:
         raise HTTPException(status_code=404, detail="Service application not found")
         
+    current_user = await db.user.find_unique(where={"id": current_user_id})
+    if not current_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    is_admin = "ADMIN" in (current_user.roles or [])
+    if service_app.service.providerId != current_user_id and not is_admin:
+        raise HTTPException(
+            status_code=403, 
+            detail="Not authorized: Only the service poster or an admin can release service escrow"
+        )
+
     if service_app.paymentStatus != PaymentStatus.HELD_IN_ESCROW or not service_app.stripeIntentId:
         raise HTTPException(status_code=400, detail="Service application payment is not held in escrow")
         
@@ -602,11 +624,38 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
             metadata={
                 "type": "PRODUCT_PRIORITY_BOOST",
                 "product_id": str(product.id),
-                "seller_id": str(current_user_id)
+                "seller_id": str(current_user_id),
+                "duration_hours": str(duration_hours)
             }
         )
 
+        return {
+            "status": "success",
+            "message": f"Payment intent created for Priority boost ({duration_hours} hours). Complete payment to activate.",
+            "fee_charged": fee_amount,
+            "duration_hours": duration_hours,
+            "client_secret": intent.client_secret,
+            "customer_id": customer_id,
+            "ephemeral_key": ephemeral_key
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Priority boost failed: {str(e)}")
+
+@router.post("/priority/product/confirm")
+async def confirm_priority_boost_product(product_id: int, current_user_id: int = Depends(get_current_user_id)):
+    try:
+        product = await db.product.find_unique(where={"id": product_id})
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        if product.sellerId != current_user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to boost this product")
+
+        fees = await get_priority_fees()
+        duration_hours = fees.get("priority_duration_hours", 24)
         expires_at = datetime.now(timezone.utc) + timedelta(hours=duration_hours)
+
         updated_product = await db.product.update(
             where={"id": product.id},
             data={
@@ -617,18 +666,14 @@ async def priority_boost_product(req: PriorityBoostProductRequest, current_user_
 
         return {
             "status": "success",
-            "message": f"Product boosted to Priority for {duration_hours} hours",
-            "fee_charged": fee_amount,
+            "message": f"Product successfully boosted to Priority for {duration_hours} hours",
             "isPriority": True,
-            "priorityExpiresAt": expires_at.isoformat(),
-            "client_secret": intent.client_secret,
-            "customer_id": customer_id,
-            "ephemeral_key": ephemeral_key
+            "priorityExpiresAt": expires_at.isoformat()
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Priority boost failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Priority boost confirmation failed: {str(e)}")
 
 @router.post("/priority/service")
 async def priority_boost_service(req: PriorityBoostServiceRequest, current_user_id: int = Depends(get_current_user_id)):
@@ -829,6 +874,41 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                 "userId": order.userId,
                 "orderId": order.id
             })
+
+        # Check if payment intent was for a Service Application
+        service_app = await db.serviceapplication.find_first(where={"stripeIntentId": intent_id})
+        if service_app:
+            await db.serviceapplication.update(
+                where={"id": service_app.id},
+                data={"paymentStatus": PaymentStatus.PAID}
+            )
+            # Log Transaction
+            await db.transaction.create(data={
+                "amount": float(data_object['amount_received']) / 100,
+                "currency": data_object['currency'],
+                "type": "PAYMENT",
+                "status": "COMPLETED",
+                "stripeChargeId": getattr(data_object, "latest_charge", None),
+                "userId": service_app.clientId,
+                "serviceApplicationId": service_app.id
+            })
+
+        # Check if payment intent was for Priority Boost
+        metadata = data_object.get('metadata', {})
+        if metadata.get('type') == 'PRODUCT_PRIORITY_BOOST' and metadata.get('product_id'):
+            try:
+                prod_id = int(metadata['product_id'])
+                hours = int(metadata.get('duration_hours', 24))
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=hours)
+                await db.product.update(
+                    where={"id": prod_id},
+                    data={
+                        "isPriority": True,
+                        "priorityExpiresAt": expires_at
+                    }
+                )
+            except Exception as ex:
+                print(f"Failed to activate product priority boost from webhook: {ex}")
             
     elif event_type == 'payment_intent.amount_capturable_updated':
         # This means Escrow hold was successful
@@ -844,6 +924,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     where={"id": order.productId},
                     data={"status": ProductStatus.SOLDOUT}
                 )
+
+        service_app = await db.serviceapplication.find_first(where={"stripeIntentId": intent_id})
+        if service_app and service_app.isEscrow:
+            await db.serviceapplication.update(
+                where={"id": service_app.id},
+                data={"paymentStatus": PaymentStatus.HELD_IN_ESCROW}
+            )
             
     elif event_type == 'charge.refunded':
         intent_id = data_object['payment_intent']
@@ -882,6 +969,13 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
                     where={"id": order.productId},
                     data={"status": ProductStatus.ACTIVE}
                 )
+
+        service_app = await db.serviceapplication.find_first(where={"stripeIntentId": intent_id})
+        if service_app:
+            await db.serviceapplication.update(
+                where={"id": service_app.id},
+                data={"paymentStatus": PaymentStatus.FAILED}
+            )
             
     elif event_type == 'charge.dispute.created':
         intent_id = data_object['payment_intent']

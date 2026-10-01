@@ -20,12 +20,19 @@ async def get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     
     user_id = int(payload.get("sub"))
+    token_version = payload.get("token_version")
     user = await db.user.find_unique(where={"id": user_id})
     
     if not user or "ADMIN" not in user.roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Only admins can access this resource"
+        )
+        
+    if token_version is not None and user.tokenVersion != token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Token has been invalidated. Please login again."
         )
     
     return user

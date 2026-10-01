@@ -86,7 +86,7 @@ async def get_my_earnings_endpoint(
 
 
 @router.get("/user/total/earnings", response_model=ProviderEarningsResponse)
-async def get_my_earnings_endpoint(
+async def get_user_earnings_endpoint(
     user_id: int = Depends(check_user_role)
 ):
     """

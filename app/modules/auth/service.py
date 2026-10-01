@@ -1,4 +1,5 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
+import time
 from fastapi import HTTPException, status, BackgroundTasks
 from app.core.db import db
 from app.common.security import hash_password, verify_password, create_access_token
@@ -49,14 +50,47 @@ async def signup_user(data: SignupRequest, background_tasks: BackgroundTasks):
     
     return {"message": "Signup successful. Please verify your OTP."}
 
+_otp_attempts: dict[str, list[float]] = {}
+
+def _check_otp_rate_limit(email: str, max_attempts: int = 5, window_seconds: int = 900):
+    now = time.time()
+    attempts = _otp_attempts.get(email, [])
+    valid_attempts = [t for t in attempts if now - t < window_seconds]
+    _otp_attempts[email] = valid_attempts
+    if len(valid_attempts) >= max_attempts:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed OTP verification attempts. Please wait 15 minutes before trying again."
+        )
+
+def _record_otp_failed_attempt(email: str):
+    attempts = _otp_attempts.get(email, [])
+    attempts.append(time.time())
+    _otp_attempts[email] = attempts
+
+def _clear_otp_attempts(email: str):
+    _otp_attempts.pop(email, None)
+
 async def verify_otp(data: VerifyOTPRequest):
+    _check_otp_rate_limit(data.email)
+
     user = await db.user.find_unique(where={"email": data.email})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.otp != data.otp:
+    # Check 10-minute expiration based on user.updatedAt
+    if user.updatedAt:
+        now = datetime.now(user.updatedAt.tzinfo) if user.updatedAt.tzinfo else datetime.now(timezone.utc)
+        if (now - user.updatedAt) > timedelta(minutes=10):
+            await db.user.update(where={"id": user.id}, data={"otp": None})
+            raise HTTPException(status_code=400, detail="OTP has expired. Please request a new OTP.")
+
+    if not user.otp or user.otp != data.otp:
+        _record_otp_failed_attempt(data.email)
         raise HTTPException(status_code=400, detail="Invalid OTP")
     
+    _clear_otp_attempts(data.email)
+
     await db.user.update(
         where={"id": user.id},
         data={
@@ -152,10 +186,25 @@ async def forget_password(email: str, background_tasks: BackgroundTasks):
     return {"message": "Password reset OTP sent."}
 
 async def verify_forget_otp(email: str, otp: str):
+    _check_otp_rate_limit(email)
+
     user = await db.user.find_unique(where={"email": email})
-    if not user or user.otp != otp:
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Check 10-minute expiration based on user.updatedAt
+    if user.updatedAt:
+        now = datetime.now(user.updatedAt.tzinfo) if user.updatedAt.tzinfo else datetime.now(timezone.utc)
+        if (now - user.updatedAt) > timedelta(minutes=10):
+            await db.user.update(where={"id": user.id}, data={"otp": None})
+            raise HTTPException(status_code=400, detail="OTP has expired. Please request a new OTP.")
+
+    if not user.otp or user.otp != otp:
+        _record_otp_failed_attempt(email)
         raise HTTPException(status_code=400, detail="Invalid OTP")
     
+    _clear_otp_attempts(email)
+
     # Create a temporary token for reset
     reset_token = create_access_token(data={"sub": str(user.id), "purpose": "reset_password"}, expires_delta=timedelta(minutes=10))
     
@@ -167,10 +216,15 @@ async def verify_forget_otp(email: str, otp: str):
     return {"reset_token": reset_token}
 
 async def reset_password(user_id: int, new_password: str):
+    user = await db.user.find_unique(where={"id": user_id})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
     hashed_pwd = hash_password(new_password)
+    new_version = (user.tokenVersion + 1) if user.tokenVersion else 2
     await db.user.update(
         where={"id": user_id},
-        data={"password": hashed_pwd}
+        data={"password": hashed_pwd, "tokenVersion": new_version}
     )
     return {"message": "Password reset successful."}
 
@@ -186,9 +240,10 @@ async def change_password(user_id: int, data: ChangePasswordRequest):
         raise HTTPException(status_code=422, detail="New password and confirm password do not match")
         
     hashed_pwd = hash_password(data.new_password)
+    new_version = (user.tokenVersion + 1) if user.tokenVersion else 2
     await db.user.update(
         where={"id": user_id},
-        data={"password": hashed_pwd}
+        data={"password": hashed_pwd, "tokenVersion": new_version}
     )
     return {"message": "Password changed successfully"}
 

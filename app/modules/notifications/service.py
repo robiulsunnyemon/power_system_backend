@@ -1,3 +1,4 @@
+import asyncio
 import firebase_admin
 from firebase_admin import credentials, messaging
 from app.core.db import db
@@ -90,7 +91,7 @@ async def send_notification(
                 "type": notification_type
             }
         )
-        response = messaging.send(message)
+        response = await asyncio.to_thread(messaging.send, message)
         return response
     except Exception as e:
         print(f"Error sending FCM to user {user_id}: {e}")
