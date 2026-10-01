@@ -54,6 +54,16 @@ async def checkout_product(req: CheckoutProductRequest, current_user_id: int = D
         
     if product.sellerId == current_user_id:
         raise HTTPException(status_code=400, detail="You cannot purchase your own product")
+
+    # Validate delivery location restrictions
+    if req.latitude is not None and req.longitude is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, matched = await is_location_allowed(req.latitude, req.longitude)
+        if not is_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="Delivery address is outside approved PowerSystem launch territory. PowerSystem is currently restricted to Perth, WA."
+            )
         
     subtotal = product.price
     platform_fee = calculate_platform_fee(subtotal, "PRODUCT")

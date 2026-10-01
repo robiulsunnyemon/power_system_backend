@@ -13,6 +13,8 @@ class CheckoutProductRequest(BaseModel):
     has_protection: bool = False
     is_escrow: bool = False
     is_cod: bool = False
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 class CheckoutServiceRequest(BaseModel):
     service_application_id: int

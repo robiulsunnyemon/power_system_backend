@@ -128,6 +128,15 @@ async def get_user_profile(user_id: int):
 
 async def update_user_profile(user_id: int, data: UpdateProfileRequest):
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    
+    # Restrict user profile coordinates to approved launch territory (Perth, WA)
+    if "latitude" in update_data and "longitude" in update_data and update_data["latitude"] is not None and update_data["longitude"] is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, _ = await is_location_allowed(update_data["latitude"], update_data["longitude"])
+        if not is_allowed:
+            update_data["latitude"] = -31.9505
+            update_data["longitude"] = 115.8605
+
     user = await db.user.update(
         where={"id": user_id},
         data=update_data,

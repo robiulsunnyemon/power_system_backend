@@ -692,3 +692,18 @@ model Dispute {
   @@map("disputes")
 }
 
+model AllowedLocation {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  state       String   @default("WA")
+  country     String   @default("Australia")
+  latitude    Float
+  longitude   Float
+  radiusKm    Float    @default(60.0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("allowed_locations")
+}
+

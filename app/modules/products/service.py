@@ -86,6 +86,16 @@ async def create_product(seller_id: int, data: ProductCreate):
     tax = data.tax_fee or 0
     delivery = data.delivery_fee or 0
     total_fee = data.price + tax + delivery
+
+    # 3.1 Validate Location Restrictions
+    if data.latitude is not None and data.longitude is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, matched = await is_location_allowed(data.latitude, data.longitude)
+        if not is_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected location is outside the approved PowerSystem service area. PowerSystem is currently restricted to Perth, WA."
+            )
             
     # 4. Create Product
     product = await db.product.create(
@@ -365,6 +375,18 @@ async def update_product(seller_id: int, product_id: int, data: ProductUpdateReq
         val = getattr(data, field)
         if val is not None:
             update_data[field] = val
+
+    # 5.1 Validate Location Restrictions
+    target_lat = update_data.get("latitude", product.latitude)
+    target_lng = update_data.get("longitude", product.longitude)
+    if ("latitude" in update_data or "longitude" in update_data) and target_lat is not None and target_lng is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, matched = await is_location_allowed(target_lat, target_lng)
+        if not is_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="Selected location is outside the approved PowerSystem service area. PowerSystem is currently restricted to Perth, WA."
+            )
             
     # 6. Execute update in DB
     updated_product = await db.product.update(

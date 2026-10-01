@@ -57,6 +57,16 @@ async def create_service(provider_id: int, data: ServiceCreate):
     # 2. Format requirements & availability
     req_data = [r.model_dump() for r in data.requirements] if data.requirements else []
     avail_data = data.availability if data.availability else []
+
+    # 2.1 Validate Location Restrictions
+    if data.latitude is not None and data.longitude is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, matched = await is_location_allowed(data.latitude, data.longitude)
+        if not is_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="The service area is outside the approved PowerSystem launch territory. PowerSystem is currently restricted to Perth, WA."
+            )
     
     # 3. Calculate upfront fees from Admin settings
     charges = await get_service_charges()
@@ -377,6 +387,18 @@ async def update_service(provider_id: int, service_id: int, data: ServiceUpdate)
         
     if "availability" in update_data and update_data["availability"]:
         update_data["availability"] = Json(update_data["availability"])
+
+    # Validate Location Restrictions
+    target_lat = update_data.get("latitude", service.latitude)
+    target_lng = update_data.get("longitude", service.longitude)
+    if ("latitude" in update_data or "longitude" in update_data) and target_lat is not None and target_lng is not None:
+        from app.modules.locations.service import is_location_allowed
+        is_allowed, matched = await is_location_allowed(target_lat, target_lng)
+        if not is_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail="The service area is outside the approved PowerSystem launch territory. PowerSystem is currently restricted to Perth, WA."
+            )
 
     # Determine target priority and status
     target_is_priority = data.isPriority if data.isPriority is not None else service.isPriority
