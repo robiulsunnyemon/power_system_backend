@@ -7,19 +7,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PRISMA_BINARY_CACHE_DIR=/root/.cache/prisma-python \
-    PRISMA_VERSION="5.22.0"
+    DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
     libatomic1 \
-    nodejs \
-    npm \
     && rm -rf /var/lib/apt/lists/*
-
-# Pre-install pinned Prisma CLI 5 to prevent nodeenv from downloading incompatible Node.js or Prisma 7
-RUN npm install -g prisma@5.22.0
 
 # Create virtual environment
 RUN python -m venv /opt/venv
